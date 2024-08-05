@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=40.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smartiris"
+version = "1.0.0"
+authors = [
+  { name="Marc Betoule", email="marc.betoule@lpnhe.in2p3.fr" },
+]
+description = ""
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = ["numpy", "pyserial", "matplotlib"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GPLV2",
+    "Operating System :: OS Independent",
+]
+
+[tool.setuptools.packages.find]
+where = ["./"]
+include = ["*"]
+exclude = []
+
+[project.urls]
+"Homepage" = "https://github.com/betoule/smartiris"
+"Bug Tracker" = "https://github.com/betoule/smartiris/issues"
+
+[project.scripts]
+logic-timer = "smartiris:test"
