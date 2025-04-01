@@ -139,13 +139,33 @@ smartiris [OPTIONS] COMMAND
   Example: `smartiris status`
 
 #### Examples
-- Open the shutter with a custom pulse width:  
-  `smartiris -w 0.05 open`
+- Open the shutter with a custom pulse width on port B:  
+  `smartiris -p B -w 25 open`
 - Keep the shutter open for 3 seconds:  
   `smartiris timed -e 3.0`
 - Check the shutter status with verbose output of the communication with the device:  
   `smartiris -v status`
+- Interrupt a long duration exposure. The shutter will remain in its current state.
+  ```
+  smartiris timed -e 10
+  sleep 0.1
+  smartiris status
+  smartiris stop
+  smartiris status
+  ```
 
+### Python library
+
+The python library provides direct access to the controler. The control logic works as follows: a short program is written to the controler specifying which pins to operate at specific timings to energize the activation coils of the shutters. The timing are specified with a resolution of 0.5μs and can extend over a duration of up to 17 minutes. The high level functions are `open_shutter` and `close_shutter` which execute a two step program (energize the coil for a given duration then release) and `program_open` which writes a 4 step program chaining the two operations separated by a given interval. The writen program can then be triggered by a call to `start_program`. Here is a complete example illustrating the various functions of the library:
+
+```python
+import smartiris
+# Connect to the device
+d = SmartIris(dev='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0')
+# Open the port A shutter
+d.open()
+
+```
 
 Contributing
 ------------
