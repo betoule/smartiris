@@ -126,6 +126,8 @@ def test():
     parser_timed.add_argument(
         '-e', '--exposure-time', type=float, default=1.,
         help='Duration to keep the shutter open (in seconds)')
+    # Parser for the 'stop' command
+    parser_close = subparsers.add_parser('stop', help='Interrupt the execution of the program. The shutter will remain in its current state')
 
     parser_status = subparsers.add_parser('status', help='Print the shutter driver status')
 
@@ -141,3 +143,5 @@ def test():
         d.start_program()
     elif args.command == 'status':
         print(d.status())
+    elif args.command == 'stop':
+        print(d.stop_program())
