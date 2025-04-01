@@ -54,13 +54,31 @@ Errors of the kind:
 ```
 PermissionError: [Errno 13] Permission denied: '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port
 ```
-means that you don't have rights to access the serial devices. On linux systems you need to add yourself to the dialout group:
+occur when you don't have access rights to the serial devices. On linux systems you need to add yourself to the dialout group:
 ```bash
 sudo usermod -a -G dialout username
 ```
 Group changes typically take effect after the user logs out and logs back in. To apply the change immediately without logging out, you can use
 ```bash
 newgrp dialout
+```
+
+#### FileNotFound errors
+
+Errors of the kind:
+```
+FileNotFoundError: [Errno 2] No such file or directory: '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0'
+```
+occur when the serial device is not at the default location. You need to identify the path to the device file by looking at appearing files in:
+```bash
+ls /dev/serial/by-id/
+#plug the device
+ls /dev/serial/by-id/
+#Look for the new line
+```
+after the device has been plugged. Once the device has been identified you can specify its path as:
+```bash
+smartiris -t /dev/serial/by-id/{actual_device_id} status
 ```
 
 ### Hardware build
