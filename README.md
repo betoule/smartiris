@@ -156,27 +156,35 @@ smartiris [OPTIONS] COMMAND
 
 ### Python library
 
-The python library provides direct access to the controler. The control logic works as follows: a short program is written to the controler specifying which pins to operate at specific timings to energize the activation coils of the shutters. The timing are specified with a resolution of 0.5μs and can extend over a duration of up to 17 minutes. The high level functions are `open_shutter` and `close_shutter` which execute a two step program (energize the coil for a given duration then release) and `program_open` which writes a 4 step program chaining the two operations separated by a given interval. The writen program can then be triggered by a call to `start_program`. Here is a complete example illustrating the various functions of the library:
+The python library provides direct access to the controler. The control logic works as follows: a short program is written to the controler specifying which pins to operate at specific timings to energize the activation coils of the shutters. The timing are specified with a resolution of 0.5μs and can extend over a duration of up to 17 minutes. The high level functions are `open_shutter` and `close_shutter` which execute a two step program (energize the coil for a given duration then release) and `timed_shutter` which executes a 4 step program chaining the two operations separated by a given interval. All writen program executions can be prevented by specifying `exec=False` then triggered latter at will by calls to `start_program`. The use of delayed execution avoid cummulating random delays in the USB communication and offer the best synchronisation timing between the host and the device. Here is a complete example illustrating the various functions of the library:
 
 ```python
 import smartiris
-# Connect to the device
+
+print('Connect to the device')
 d = smartiris.SmartIris(dev='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0')
-# Query the shutter status:
+
+print(' Query the shutter status')
 print(d.status())
-# Open the port A shutter
+
+print('Open the port A shutter')
 d.open_shutter()
-# Wait for completion
-d.wait()
-# Close port A shutter
-d.close_shutter()
+print('Wait for completion')
 d.wait()
 
-# Open for 3 seconds after a 2 seconds delay (setup only)
-d.program_open(delay_sec=2, duration_sec=3)
-# trigger
+print('Close port A shutter')
+d.close_shutter()
+print('Wait for completion')
+d.wait()
+
+print('Open for 3 seconds after a 2 seconds delay (setup only)')
+d.timed_shutter(delay_sec=2, duration_sec=3)
+print('Wait for completion')
+d.wait()
+
+print('re-trigger')
 d.start_program()
-# Wait for completion
+print('Wait for completion')
 d.wait()
 ```
 

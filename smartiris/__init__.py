@@ -18,51 +18,134 @@ import time
 import numpy as np
 import argparse
 
+import numpy as np
+import struct
+import time
+
 class SmartIris(bincoms.SerialBC):
+    """A class to control an iris blade shutter via serial communication.
+
+    Inherits from bincoms.SerialBC to provide low-level serial communication
+    functionality. This class manages shutter operations such as opening,
+    closing, and timed sequences using a microcontroller's timer.
+
+    Attributes:
+        time_resolution (float): The timer resolution in seconds (default: 0.5e-6).
+    """
+
     def __init__(self, *args, **keys):
+        """Initialize the SmartIris instance.
+
+        Args:
+            *args: Variable length argument list passed to the parent class.
+            **keys: Keyword arguments passed to the parent class.
+        """
         super().__init__(*args, **keys)
         self.time_resolution = 0.5e-6
 
     def _ct(self, seconds):
-        ''' Convert the floating point duration in seconds to a count number for the microcontroller timer
-        '''
-        return int(np.round(seconds/self.time_resolution))
-    
-    def async_packet_read(self):
-        ans = self.rcv()
-        answer = struct.unpack('<IB', ans)
-        return answer
+        """Convert a duration in seconds to a microcontroller timer count.
+
+        Args:
+            seconds (float): Duration in seconds to convert.
+
+        Returns:
+            int: The number of timer counts, rounded to the nearest integer.
+        """
+        return int(np.round(seconds / self.time_resolution))
+
+#    def async_packet_read(self):
+#        """Read and unpack an asynchronous response packet from the device.
+#
+#        Returns:
+#            tuple: A tuple containing two values unpacked from the response
+#                (format: '<IB', little-endian unsigned int and byte).
+#        """
+#        ans = self.rcv()
+#        answer = struct.unpack('<IB', ans)
+#        return answer
 
     def pulse_sec(self, pin, pulsewidth_sec):
-        ''' Pulse the provided pin for a number of seconds
-        '''
+        """Generate a pulse on the specified pin for a given duration.
+
+        Args:
+            pin (int): The pin number to pulse.
+            pulsewidth_sec (float): Duration of the pulse in seconds.
+        """
         self.pulse(pin, self._ct(pulsewidth_sec))
 
-    def program_open(self, delay_sec=10e-3, duration_sec=1, port='A', pulsewidth_sec=30e-3):
+    def timed_shutter(self, delay_sec=1e-4, duration_sec=1, port='A', pulsewidth_sec=30e-3, exec=True):
+        """Program a sequence to open and close the shutter with specified timing.
+
+        This method sets up a sequence of pulses to open the shutter after a delay,
+        keep it open for a duration, and then close it. 
+
+        Args:
+            delay_sec (float): Initial delay before starting (default: 100 μs).
+            duration_sec (float): Time to keep the shutter open (default: 1 s).
+            port (str): Shutter port identifier (default: 'A').
+            pulsewidth_sec (float): Duration of the opening/closing pulses (default: 0.03 s).
+            exec (bool): If false program only. The execution can be triggered later using method start_program.
+        """
         pins = port_pins[port]
         self.program_pulse(pins['open'], 0, self._ct(delay_sec))
         self.program_pulse(pins['open'], 1, self._ct(delay_sec + pulsewidth_sec))
         self.program_pulse(pins['close'], 2, self._ct(delay_sec + duration_sec))
         self.program_pulse(pins['close'], 3, self._ct(delay_sec + duration_sec + pulsewidth_sec))
-        #self.start_program()
+        if exec:
+            self.start_program()
 
-    def open_shutter(self, port='A', pulsewidth_sec=30e-3, delay_sec=10e-3):
+    def open_shutter(self, port='A', pulsewidth_sec=30e-3, delay_sec=10e-3, exec=True):
+        """Open the shutter on the specified port.
+
+        Programs and starts a sequence to activate the open pin for the given pulse width.
+
+        Args:
+            port (str): Shutter port identifier (default: 'A').
+            pulsewidth_sec (float): Duration of the opening pulse (default: 0.03 s).
+            delay_sec (float): Delay before starting (default: 0.01 s).
+            exec (bool): If false program only. The execution can be triggered later using method start_program.
+        """
         pins = port_pins[port]
         self.program_pulse(pins['open'], 0, self._ct(delay_sec))
         self.program_pulse(pins['open'], 1, self._ct(delay_sec + pulsewidth_sec))
-        self.start_program()
-        
+        if exec:
+            self.start_program()
+
     def close_shutter(self, port='A', pulsewidth_sec=30e-3, delay_sec=10e-3):
+        """Close the shutter on the specified port.
+
+        Programs and starts a sequence to activate the close pin for the given pulse width.
+
+        Args:
+            port (str): Shutter port identifier (default: 'A').
+            pulsewidth_sec (float): Duration of the closing pulse (default: 0.03 s).
+            delay_sec (float): Delay before starting (default: 0.01 s).
+            exec (bool): If false program only. The execution can be triggered later using method start_program.
+        """
         pins = port_pins[port]
         self.program_pulse(pins['close'], 0, self._ct(delay_sec))
         self.program_pulse(pins['close'], 1, self._ct(delay_sec + pulsewidth_sec))
-        self.start_program()
+        if exec:
+            self.start_program()
 
     def read_program(self):
+        """Print the programmed pulse sequence for debugging.
+
+        Reads and displays the program steps (up to 4) from the device.
+        """
         for i in range(4):
             print(self.get_program(i))
 
     def status(self):
+        """Retrieve the current status of the shutter driver.
+
+        Returns:
+            dict: A dictionary containing:
+                - 'shutter_A': State of shutter A ('open' or 'closed').
+                - 'shutter_B': State of shutter B ('open' or 'closed').
+                - 'busy': Boolean indicating if a program is running.
+        """
         com_port, read_port, program_cursor, program_length = self.raw_status()
         if self.debug:
             print(f'{com_port=}, {read_port=}, {program_cursor=},{program_length=}')
@@ -74,11 +157,13 @@ class SmartIris(bincoms.SerialBC):
         return status
 
     def wait(self):
-        ''' Block until the shutter program is finished (busy flag released)
-        '''
+        """Block execution until the shutter program completes.
+
+        Polls the status until the 'busy' flag is cleared, checking every 0.1 seconds.
+        """
         while self.status()['busy']:
             time.sleep(0.1)
-        
+            
 pin_map = {8: 0,
            9: 1,
            10: 2,
@@ -156,8 +241,7 @@ def test():
     elif args.command == 'close':
         d.close_shutter(port=args.port, pulsewidth_sec=args.pulse_width)
     elif args.command == 'timed':
-        d.program_open(port=args.port, pulsewidth_sec=args.pulse_width, duration_sec=args.exposure_time, delay_sec=args.delay)
-        d.start_program()
+        d.timed_shutter(port=args.port, pulsewidth_sec=args.pulse_width, duration_sec=args.exposure_time, delay_sec=args.delay)
     elif args.command == 'status':
         print(d.status())
     elif args.command == 'stop':
