@@ -45,7 +45,10 @@ def lookup():
 
 def _command_factory(self, f, s, a):
     def func(self, *args):
-        data = struct.pack(b'<B' + s, f, *args)
+        try:
+            data = struct.pack(b'<B' + s, f, *args)
+        except struct.error:
+            raise ValueError(f'Provided arguments {args} do not match the requested types {s}')
         if self.debug:
             print(f'Encoding request with arguments {args} according to format {b"B"+s} as: {data}')
         r = self.snd(data)

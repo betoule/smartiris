@@ -28,4 +28,4 @@ exclude = []
 "Bug Tracker" = "https://github.com/betoule/smartiris/issues"
 
 [project.scripts]
-logic-timer = "smartiris:test"
+smartiris = "smartiris:test"

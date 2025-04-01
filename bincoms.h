@@ -35,7 +35,7 @@ extern const char* command_names[];
 extern void (*func[])(uint8_t rb);
 extern const uint8_t NFUNC;
 extern uint16_t timeHB;
-extern uint16_t duration;
+
 void stop();
 
 template <class com>
@@ -75,8 +75,6 @@ struct Com{
 	else
 	  rcv_header();
       }
-      if ((duration > 0) && (timeHB > duration))
-	stop();
     }
   }
 

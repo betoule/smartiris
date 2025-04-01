@@ -29,13 +29,19 @@ Getting Started
 
 ### Hardware build
 
+* Schematics is available in directory 
+* Files for the 3D case are available in 3D
+* Once assembled connect your computer to the arduino and flash the firmware using:
+
+```
+make upload 
+```
 
 ### Software Installation
 
 1. Connect the controller to your computer via a USB port using a USB A to Mini-B cable.
 2. Download, install, and run the control software for your operating system from the project's GitHub repository.
 3. Ensure that both Iris shutters are properly connected to the controller with matching channel assignments.
-4. Use the intuitive graphical user interface (GUI) to independently control each shutter's opening and closing.
 
 Usage
 -----
