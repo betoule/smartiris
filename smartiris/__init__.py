@@ -72,6 +72,12 @@ class SmartIris(bincoms.SerialBC):
             'busy': program_cursor != 0,
         }
         return status
+
+    def wait(self):
+        ''' Block until the shutter program is finished (busy flag released)
+        '''
+        while self.status()['busy']:
+            time.sleep(0.1)
         
 pin_map = {8: 0,
            9: 1,

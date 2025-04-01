@@ -123,16 +123,17 @@ ISR(TIMER1_COMPA_vect){
   // Emulate 32 bit resolution by executing the code only if the high
   // bytes of the timer counter also match. The additionnal 16 bit
   // comparison adds a small (but constant) delay to the pin change.
-  if (timeHB == HB_array[event]){
-    PINB = pin_array[event];
-    event++;
+  if (timeHB == HB_array[event-1]){
+    PINB = pin_array[event-1];
     if (event == n_events){
       STOP_TIMER;
       DISABLE_INT;
       event = 0;
     }
-    else
+    else{
       OCR1A = LB_array[event];
+      event++;
+    }
   }
 }
 
@@ -197,10 +198,10 @@ void get_program(uint8_t rb){
 void start_program(uint8_t rb){
   /* Start the execution of the pulse program
    */
-  event = 0;
+  event = 1;
   
   // Split that into a high and low resolution part
-  OCR1A = LB_array[event];
+  OCR1A = LB_array[0];
 
   // Reset the timer
   timeHB=0;

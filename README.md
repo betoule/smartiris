@@ -161,10 +161,23 @@ The python library provides direct access to the controler. The control logic wo
 ```python
 import smartiris
 # Connect to the device
-d = SmartIris(dev='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0')
+d = smartiris.SmartIris(dev='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0')
+# Query the shutter status:
+print(d.status())
 # Open the port A shutter
-d.open()
+d.open_shutter()
+# Wait for completion
+d.wait()
+# Close port A shutter
+d.close_shutter()
+d.wait()
 
+# Open for 3 seconds after a 2 seconds delay (setup only)
+d.program_open(delay_sec=2, duration_sec=3)
+# trigger
+d.start_program()
+# Wait for completion
+d.wait()
 ```
 
 Contributing

@@ -71,7 +71,7 @@ def _command_factory(self, f, s, a):
     return types.MethodType(func, self)
 
 class SerialBC(object):
-    def __init__(self, dev='/dev/ttyUSB0', baudrate=1000000, debug=True, reset=False):
+    def __init__(self, dev='/dev/ttyUSB0', baudrate=1000000, debug=False, reset=False):
         self.debug=debug
         self._dev = dev
         self._baudrate = baudrate
