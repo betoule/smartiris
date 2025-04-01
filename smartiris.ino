@@ -18,11 +18,10 @@
 /* The main fonction of the API. Send a pulse of a given duration on
    the given line.
  */ 
-void pulse(uint8_t rb);
 void program_pulse(uint8_t rb);
 void start_program(uint8_t rb);
+void stop_program(uint8_t rb);
 void get_program(uint8_t rb);
-void get_event(uint8_t rb);
 void status(uint8_t rb);
 
 uint32_t duration = 29;
@@ -47,7 +46,7 @@ uint16_t HB_array[MAX_N_EVENTS];
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+6;
+const uint8_t NFUNC = 2+5;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -55,11 +54,10 @@ void (*func[NFUNC])(uint8_t rb) =
    command_count,
    get_command_names,
    // user defined
-   pulse,
    program_pulse,
    start_program,
+   stop_program,
    get_program,
-   get_event,
    status,
   };
 
@@ -67,13 +65,11 @@ const char* command_names[NFUNC*3] =
   {"command_count", "", "B",
    "get_command_names", "BB", "s",
    // user defined
-   "pulse", "BI", "I",
    "program_pulse", "BBI", "I",
    "start_program", "", "",
+   "stop_program", "", "",
    "get_program", "B", "IB",
-   "get_event", "", "B",
    "raw_status", "", "BBBB",
-   //"enable_line", "Bc", "",
   };
 
 
@@ -122,31 +118,11 @@ ISR(TIMER1_OVF_vect){
   timeHB++;
 }
 
-/*
+// Timer Interruption handling
 ISR(TIMER1_COMPA_vect){
-  if (timeHB == duration_HB){
-    PINB = pin;
-    STOP_TIMER;
-    DISABLE_INT;
-  }
-}
-
-ISR(TIMER1_COMPB_vect){
-  if (timeHB == HB_array[event]){
-    PINB = pin_array[event];
-    event++;
-    if (event == n_events){
-      STOP_TIMER;
-      DISABLE_INT;
-      event = 0;
-    }
-    else
-      OCR1B = LB_array[event];
-  }
-}
-*/
-
-ISR(TIMER1_COMPA_vect){
+  // Emulate 32 bit resolution by executing the code only if the high
+  // bytes of the timer counter also match. The additionnal 16 bit
+  // comparison adds a small (but constant) delay to the pin change.
   if (timeHB == HB_array[event]){
     PINB = pin_array[event];
     event++;
@@ -164,37 +140,14 @@ void loop(){
   client.serve_serial();
 }
 
-void pulse(uint8_t rb){
-  pin = *((uint8_t *) (client.read_buffer+rb));
-  // We receive the duration as timer count with a resolution of
-  // 0.5e-6s
-  duration = *((uint32_t *) (client.read_buffer+rb+1));
-  if (pin > 5){
-    client.snd((uint8_t*) &duration, 4, VALUE_ERROR);
-    return;
-  }
-  else
-    client.snd((uint8_t*) &duration, 4);
-  // Convert the pin number to bit positon
-  pin = 1 << pin;
-  // Split that into a high and low resolution part
-  OCR1A = duration & 0xFFFF;
-  duration_HB = duration >> 16;
-  // Reset the timer
-  timeHB=0;
-  TCNT1=0;
-  CLEAR_INT;
-  ENABLE_INT;
-  START_TIMER;
-  PINB = pin;
-  //client.snd((uint8_t*) &duration, 4);
-  // Clear the interrupt vectors
-  //CLEARINT;
-  // Enable interrupt handling
-  //ENABLEINT;
-}
-
 void program_pulse(uint8_t rb){
+  /* Program one slot of the pulse program
+   *
+   * The function reads 3 arguments from the communication buffer:
+   * pin: the pin to switch between 0 and 5 (Byte)
+   * n_events: (Byte) the slot number in the program between 0 and MAX_N_EVENTS - 1
+   * duration: (int) the timing of the switch in counts since the launch of the program. A count as a value of 0.5e-6 seconds.
+   */
   pin = *((uint8_t *) (client.read_buffer + rb));
   n_events = *((uint8_t *) (client.read_buffer + rb+1));
   // We receive the duration as timer count with a resolution of
@@ -222,6 +175,15 @@ void program_pulse(uint8_t rb){
 }
 
 void get_program(uint8_t rb){
+  /* Query a slot of the pulse program
+   *
+   * The function reads 1 arguments from the communication buffer:
+   * i: (Byte) the slot number in the program between 0 and MAX_N_EVENTS - 1
+   *
+   * It returns 2 values to the communication buffer:
+   * duration: (Int) the timing of the pulse in slot i (in counts)
+   * pin: (Byte) the index of the pin switched in the PORTB
+   */
   uint8_t data[5];
   uint8_t i = *((uint8_t *) (client.read_buffer + rb));
   duration = HB_array[i];
@@ -233,10 +195,11 @@ void get_program(uint8_t rb){
 }
 
 void start_program(uint8_t rb){
+  /* Start the execution of the pulse program
+   */
   event = 0;
   
   // Split that into a high and low resolution part
-  //OCR1B = LB_array[event];
   OCR1A = LB_array[event];
 
   // Reset the timer
@@ -248,11 +211,25 @@ void start_program(uint8_t rb){
   client.sndstatus(STATUS_OK);
 }
 
-void get_event(uint8_t rb){
-  client.snd((uint8_t*) &event, 1, STATUS_OK);
+void stop_program(uint8_t rb){
+  /* Stop the program exectution
+   */
+  STOP_TIMER;
+  DISABLE_INT;
+  event = 0;
+  PORTB = 0;
+  client.sndstatus(STATUS_OK);
 }
 
 void status(uint8_t rb){
+  /* Return the status of device
+   *
+   * The function return 4 bytes to communication buffer:
+   * PINB the state of the 8 GPIO pins in Port B
+   * PIND the state of the 8 GPIO pins in Port D
+   * event the current index of the slot in program
+   * n_events the length of the program
+   */
   uint8_t data[4];
   data[0] = PINB;
   data[1] = PIND;

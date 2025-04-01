@@ -141,18 +141,3 @@ def test():
         d.start_program()
     elif args.command == 'status':
         print(d.status())
-    #d.open_for(duration_sec=args.interval, pulsewidth_sec=args.duration)
-    #for i in range(args.n_pulses):
-    #    d.pulse_sec(pin_map[args.pin], args.duration)
-    #    time.sleep(args.interval)
-    
-    #for l in args.enabled_lines:
-    #    if len(l) != 2:
-    #        raise ValueError(f"Line identifier {l} does not comply with expected format [0-6][fr]")
-    #    lid, front = int(l[0]), l[1].encode() 
-    #    d.enable_line(lid, front)
-    #import numpy as np
-    #print(f'Recording lines {args.enabled_lines} for {args.duration}s')
-    #result = np.rec.fromrecords(d.get_data(), names=['time', 'pinstate'])
-    #print(f'Record saved to file {args.output_file}')
-    #np.save(args.output_file, result)
