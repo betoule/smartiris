@@ -48,12 +48,26 @@ Example output for two closed and connected shutters:
 
 ### Troubleshooting
 
+#### Permission errors 
+
+Errors of the kind:
+```
+PermissionError: [Errno 13] Permission denied: '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port
+```
+means that you don't have rights to access the serial devices. On linux systems you need to add yourself to the dialout group:
+```bash
+sudo usermod -a -G dialout username
+```
+Group changes typically take effect after the user logs out and logs back in. To apply the change immediately without logging out, you can use
+```bash
+newgrp dialout
+```
+
 ### Hardware build
 
 * Schematics is available in directory `schematics`
 * Files to build a 3D case are available in `3D`
 * Once assembled connect your computer to the arduino and flash the firmware using the arduino IDE. The code is compatible with version 1.8 of the IDE. Open the sketch `smartiris.ino` and upload the sketch.
-
 
 Contributing
 ------------
