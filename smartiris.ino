@@ -23,6 +23,7 @@ void program_pulse(uint8_t rb);
 void start_program(uint8_t rb);
 void get_program(uint8_t rb);
 void get_event(uint8_t rb);
+void status(uint8_t rb);
 
 uint32_t duration = 29;
 uint16_t duration_HB;
@@ -46,7 +47,7 @@ uint16_t HB_array[MAX_N_EVENTS];
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+5;
+const uint8_t NFUNC = 2+6;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -59,6 +60,7 @@ void (*func[NFUNC])(uint8_t rb) =
    start_program,
    get_program,
    get_event,
+   status,
   };
 
 const char* command_names[NFUNC*3] =
@@ -70,6 +72,7 @@ const char* command_names[NFUNC*3] =
    "start_program", "", "",
    "get_program", "B", "IB",
    "get_event", "", "B",
+   "status", "", "BBBB",
    //"enable_line", "Bc", "",
   };
 
@@ -247,4 +250,13 @@ void start_program(uint8_t rb){
 
 void get_event(uint8_t rb){
   client.snd((uint8_t*) &event, 1, STATUS_OK);
+}
+
+void status(uint8_t rb){
+  uint8_t data[4];
+  data[0] = PINB;
+  data[1] = PIND;
+  data[2] = event;
+  data[3] = n_events;
+  client.snd((uint8_t*) &data, 4, STATUS_OK);
 }
