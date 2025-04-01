@@ -50,13 +50,9 @@ Example output for two closed and connected shutters:
 
 ### Hardware build
 
-* Schematics is available in directory 
-* Files for the 3D case are available in 3D
-* Once assembled connect your computer to the arduino and flash the firmware using:
-
-```
-make upload 
-```
+* Schematics is available in directory `schematics`
+* Files to build a 3D case are available in `3D`
+* Once assembled connect your computer to the arduino and flash the firmware using the arduino IDE. The code is compatible with version 1.8 of the IDE. Open the sketch `smartiris.ino` and upload the sketch.
 
 
 Contributing
