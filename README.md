@@ -69,6 +69,64 @@ newgrp dialout
 * Files to build a 3D case are available in `3D`
 * Once assembled connect your computer to the arduino and flash the firmware using the arduino IDE. The code is compatible with version 1.8 of the IDE. Open the sketch `smartiris.ino` and upload the sketch.
 
+Usage
+-----
+### Command line
+
+The `smartiris` command-line tool controls supports several commands and options to operate the shutter.
+
+#### Basic Syntax
+```
+smartiris [OPTIONS] COMMAND
+```
+
+#### Options
+- `-t, --tty PORT`  
+  Specify the TTY port (default: `/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0`).
+- `-w, --pulse-width SECONDS`  
+  Set the duration of opening/closing pulses in seconds (default: `0.03`).
+- `-p, --port ID`  
+  Select the shutter port (default: `A`; choices depend on `port_pins`).
+- `-v, --verbose`  
+  Enable debug output for communication.
+- `-r, --reset`  
+  Perform a hard reset of the device on startup. The execution of the command is slower at first call.
+
+#### Commands
+- `open`  
+  Open the shutter.  
+  Example: `smartiris open`
+
+- `close`  
+  Close the shutter.  
+  Example: `smartiris close`
+
+- `timed`  
+  Open the shutter for a specified duration.  
+  Additional options:  
+  - `-d, --delay SECONDS`  
+    Delay before action (default: `0.01` seconds).  
+  - `-e, --exposure-time SECONDS`  
+    Duration to keep the shutter open (default: `1.0` seconds).  
+  Example: `smartiris timed -e 2.5`
+
+- `stop`  
+  Interrupt execution, leaving the shutter in its current state.  
+  Example: `smartiris stop`
+
+- `status`  
+  Display the current status of the shutter driver.  
+  Example: `smartiris status`
+
+#### Examples
+- Open the shutter with a custom pulse width:  
+  `smartiris -w 0.05 open`
+- Keep the shutter open for 3 seconds:  
+  `smartiris timed -e 3.0`
+- Check the shutter status with verbose output of the communication with the device:  
+  `smartiris -v status`
+
+
 Contributing
 ------------
 
