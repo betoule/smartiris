@@ -72,7 +72,7 @@ const char* command_names[NFUNC*3] =
    "start_program", "", "",
    "get_program", "B", "IB",
    "get_event", "", "B",
-   "status", "", "BBBB",
+   "raw_status", "", "BBBB",
    //"enable_line", "Bc", "",
   };
 

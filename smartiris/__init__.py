@@ -60,7 +60,18 @@ class SmartIris(bincoms.SerialBC):
     def read_program(self):
         for i in range(4):
             print(self.get_program(i))
-    
+
+    def status(self):
+        com_port, read_port, program_cursor, program_length = self.raw_status()
+        if self.debug:
+            print(f'{com_port=}, {read_port=}, {program_cursor=},{program_length=}, {shutter_A=}, {shutter_B=}')
+        status = {
+            'shutter_A': 'closed' if read_port & 0b100 else 'open',
+            'shutter_B': 'closed' if read_port & 0b1000 else 'open',
+            'busy': program_cursor != 0,
+        }
+        return status
+        
 pin_map = {8: 0,
            9: 1,
            10: 2,
