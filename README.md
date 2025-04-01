@@ -46,6 +46,8 @@ Example output for two closed and connected shutters:
 {'shutter_A': 'closed', 'shutter_B': 'closed', 'busy': False}
 ```
 
+Unconnected shutters appear as `open`. The same is true of partly open shutters.
+
 ### Troubleshooting
 
 #### Permission errors 

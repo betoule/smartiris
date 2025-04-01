@@ -16,6 +16,7 @@ import bincoms
 import struct
 import time
 import numpy as np
+import argparse
 
 class SmartIris(bincoms.SerialBC):
     def __init__(self, *args, **keys):
@@ -87,17 +88,27 @@ port_pins = {'A': {'close': pin_map[8],
                    },
              }
 
+
+def restricted_float(x, min_val=5., max_val=35.):
+    try:
+        x = float(x)  # Convert string input to float
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{x} is not a valid float")
+    if not (min_val <= x <= max_val):
+        raise argparse.ArgumentTypeError(f"{x} is not in range [{min_val}, {max_val}]")
+    return x
+
 def test():
     ''' Operate the shutter from the command line'''
-    import argparse
     parser = argparse.ArgumentParser(
         description='Operate an iris blade shutter')
     parser.add_argument(
         '-t', '--tty', default='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0',
         help='link to a specific tty port')
     parser.add_argument(
-        '-w', '--pulse-width', default=30e-3, type=float,
-        help='Duration of the opening and closing pulses (in seconds).')
+        '-w', '--pulse-width', default=30e-3,
+        type=lambda x: restricted_float(x, min_val=5., max_val=35.) * 1e-3,
+        help='Duration of the opening and closing pulses (in milliseconds). Too long pulses might damage the shutter excitation coil or discharge to deeply the build-in capacitor bank of controller, causing reset of the device. Pulses too short will result in incomplete (or unreliable) opening or closing of the blades.')
     parser.add_argument(
         '-p', '--port', default='A', choices=port_pins,
         help='Identifier of the shutter port. "A" is the port on the left when looking the shutter ports on the box.')
