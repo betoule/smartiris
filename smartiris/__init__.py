@@ -120,7 +120,11 @@ def test():
     # Parser for the 'timed' command
     parser_timed = subparsers.add_parser('timed', help='Open shutter for a specific duration')
     parser_timed.add_argument(
-        '-d', '--duration', type=float, default=1.,
+        '-d', '--delay', type=float, default=10e-3,
+        help='Duration to keep the shutter open (in seconds)')
+
+    parser_timed.add_argument(
+        '-e', '--exposure-time', type=float, default=1.,
         help='Duration to keep the shutter open (in seconds)')
 
     parser_status = subparsers.add_parser('status', help='Print the shutter driver status')
@@ -133,7 +137,7 @@ def test():
     elif args.command == 'close':
         d.close_shutter(port=args.port, pulsewidth_sec=args.pulse_width)
     elif args.command == 'timed':
-        d.program_open(port=args.port, pulsewidth_sec=args.pulse_width, duration_sec=args.duration)
+        d.program_open(port=args.port, pulsewidth_sec=args.pulse_width, duration_sec=args.exposure_time, delay_sec=args.delay)
         d.start_program()
     elif args.command == 'status':
         print(d.status())
