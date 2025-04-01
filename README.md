@@ -27,6 +27,27 @@ Getting Started
 * USB A to Mini-B cable
 * 3D printed or custom PCB case (optional)
 
+### Software Installation
+
+1. Download and install the control software for your operating system from the project's GitHub repository:
+```bash
+git clone https://github.com/betoule/smartiris.git
+cd smartiris
+pip install .
+```
+2. Connect the controller to your computer via a USB port using a USB A to Mini-B cable.
+3. Ensure that an Iris shutters is properly connected to the controller with matching channel assignments. Port "A" and "B" refers to the left and right port respectively.
+4. Test the status:
+```bash
+smartiris status
+```
+Example output for two closed and connected shutters:
+```
+{'shutter_A': 'closed', 'shutter_B': 'closed', 'busy': False}
+```
+
+### Troubleshooting
+
 ### Hardware build
 
 * Schematics is available in directory 
@@ -37,24 +58,6 @@ Getting Started
 make upload 
 ```
 
-### Software Installation
-
-1. Connect the controller to your computer via a USB port using a USB A to Mini-B cable.
-2. Download, install, and run the control software for your operating system from the project's GitHub repository.
-3. Ensure that both Iris shutters are properly connected to the controller with matching channel assignments.
-
-Usage
------
-
-1. To open or close a specific iris, select the desired channel using the dropdown menu in the GUI.
-2. Press the "Open" button to fully open the selected iris, or press the "Close" button to fully close it.
-3. Adjust the speed settings for fine-tuned control over the movement (optional).
-4. Disconnect the controller when not in use to conserve power and prolong its life span.
-
-Troubleshooting
---------------
-
-For any issues, consult the project's documentation or visit the GitHub repository for more information and support.
 
 Contributing
 ------------
