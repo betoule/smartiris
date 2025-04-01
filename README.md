@@ -86,7 +86,7 @@ smartiris [OPTIONS] COMMAND
 - `-w, --pulse-width SECONDS`  
   Set the duration of opening/closing pulses in seconds (default: `0.03`).
 - `-p, --port ID`  
-  Select the shutter port (default: `A`; choices depend on `port_pins`).
+  Select the shutter port (default: `A`).
 - `-v, --verbose`  
   Enable debug output for communication.
 - `-r, --reset`  

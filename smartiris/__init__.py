@@ -64,7 +64,7 @@ class SmartIris(bincoms.SerialBC):
     def status(self):
         com_port, read_port, program_cursor, program_length = self.raw_status()
         if self.debug:
-            print(f'{com_port=}, {read_port=}, {program_cursor=},{program_length=}, {shutter_A=}, {shutter_B=}')
+            print(f'{com_port=}, {read_port=}, {program_cursor=},{program_length=}')
         status = {
             'shutter_A': 'closed' if read_port & 0b100 else 'open',
             'shutter_B': 'closed' if read_port & 0b1000 else 'open',
