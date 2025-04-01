@@ -111,7 +111,9 @@ def test():
     parser_timed.add_argument(
         '-d', '--duration', type=float, default=1.,
         help='Duration to keep the shutter open (in seconds)')
-    
+
+    parser_status = subparsers.add_parser('status', help='Print the shutter driver status')
+
     args = parser.parse_args()
 
     d = SmartIris(dev=args.tty, baudrate=1000000, debug=args.verbose, reset=args.reset)
@@ -122,7 +124,8 @@ def test():
     elif args.command == 'timed':
         d.program_open(port=args.port, pulsewidth_sec=args.pulse_width, duration_sec=args.duration)
         d.start_program()
-    
+    elif args.command == 'status':
+        print(d.status())
     #d.open_for(duration_sec=args.interval, pulsewidth_sec=args.duration)
     #for i in range(args.n_pulses):
     #    d.pulse_sec(pin_map[args.pin], args.duration)
