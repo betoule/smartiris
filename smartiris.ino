@@ -24,7 +24,7 @@ void stop_program(uint8_t rb);
 void get_program(uint8_t rb);
 void status(uint8_t rb);
 
-uint32_t duration = 29;
+uint32_t duration;
 uint16_t duration_HB;
 uint16_t duration_LB;
 uint16_t timeHB;
@@ -34,9 +34,14 @@ uint8_t pin;
 const uint8_t MAX_N_EVENTS=4;
 uint8_t n_events;
 uint8_t event;
-uint8_t pin_array[MAX_N_EVENTS];
-uint16_t LB_array[MAX_N_EVENTS];
-uint16_t HB_array[MAX_N_EVENTS];
+
+typedef struct {
+  uint16_t time_LB;
+  uint16_t time_HB;
+  uint8_t pin;
+} Event;
+
+Event program[MAX_N_EVENTS];
 
 #define STOP_TIMER TCCR1B = 0b00000000
 #define START_TIMER TCCR1B = 0b00000010
@@ -123,15 +128,15 @@ ISR(TIMER1_COMPA_vect){
   // Emulate 32 bit resolution by executing the code only if the high
   // bytes of the timer counter also match. The additionnal 16 bit
   // comparison adds a small (but constant) delay to the pin change.
-  if (timeHB == HB_array[event-1]){
-    PINB = pin_array[event-1];
+  if (timeHB == program[event-1].time_HB){
+    PINB = program[event-1].pin;
     if (event == n_events){
       STOP_TIMER;
       DISABLE_INT;
       event = 0;
     }
     else{
-      OCR1A = LB_array[event];
+      OCR1A = program[event].time_LB;
       event++;
     }
   }
@@ -167,11 +172,11 @@ void program_pulse(uint8_t rb){
 
   // set up the pin sequence
   // Converting the pin number to bit positon
-  pin_array[n_events] = 1 << pin;
+  program[n_events].pin = 1 << pin;
 
   // set up the timings
-  LB_array[n_events] = duration & 0xFFFF;
-  HB_array[n_events] = duration >> 16;
+  program[n_events].time_LB = duration & 0xFFFF;
+  program[n_events].time_HB = duration >> 16;
   n_events++;
 }
 
@@ -187,11 +192,11 @@ void get_program(uint8_t rb){
    */
   uint8_t data[5];
   uint8_t i = *((uint8_t *) (client.read_buffer + rb));
-  duration = HB_array[i];
+  duration = program[i].time_HB;
   duration <<= 16;
-  duration += LB_array[i];
+  duration += program[i].time_LB;
   *((uint32_t*)(data)) = duration;
-  data[4] = pin_array[i];
+  data[4] = program[i].pin;
   client.snd((uint8_t*) data, 5, STATUS_OK);
 }
 
@@ -201,7 +206,7 @@ void start_program(uint8_t rb){
   event = 1;
   
   // Split that into a high and low resolution part
-  OCR1A = LB_array[0];
+  OCR1A = program[0].time_LB;
 
   // Reset the timer
   timeHB=0;
@@ -237,4 +242,9 @@ void status(uint8_t rb){
   data[2] = event;
   data[3] = n_events;
   client.snd((uint8_t*) &data, 4, STATUS_OK);
+}
+
+void switch_button(int button){
+  if (event == 0){
+  }
 }
