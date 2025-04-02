@@ -34,14 +34,18 @@ uint8_t pin;
 const uint8_t MAX_N_EVENTS=4;
 uint8_t n_events;
 uint8_t event;
-
 typedef struct {
   uint16_t time_LB;
   uint16_t time_HB;
   uint8_t pin;
 } Event;
 
+Event * active_program;
+uint8_t active_nevent;
+
 Event program[MAX_N_EVENTS];
+Event OpenA[2] = {{20000, 0x0, 0x2}, {(uint16_t)80000, 0x0, 0x2}};
+Event CloseA[2] = {{20000, 0x0, 0x1}, {(uint16_t)80000, 0x0, 0x1}};
 
 #define STOP_TIMER TCCR1B = 0b00000000
 #define START_TIMER TCCR1B = 0b00000010
@@ -128,15 +132,15 @@ ISR(TIMER1_COMPA_vect){
   // Emulate 32 bit resolution by executing the code only if the high
   // bytes of the timer counter also match. The additionnal 16 bit
   // comparison adds a small (but constant) delay to the pin change.
-  if (timeHB == program[event-1].time_HB){
-    PINB = program[event-1].pin;
-    if (event == n_events){
+  if (timeHB == active_program[event-1].time_HB){
+    PINB = active_program[event-1].pin;
+    if (event == active_nevent){
       STOP_TIMER;
       DISABLE_INT;
       event = 0;
     }
     else{
-      OCR1A = program[event].time_LB;
+      OCR1A = active_program[event].time_LB;
       event++;
     }
   }
@@ -204,7 +208,8 @@ void start_program(uint8_t rb){
   /* Start the execution of the pulse program
    */
   event = 1;
-  
+  active_program = program;
+  active_nevent = n_events;
   // Split that into a high and low resolution part
   OCR1A = program[0].time_LB;
 
@@ -246,5 +251,7 @@ void status(uint8_t rb){
 
 void switch_button(int button){
   if (event == 0){
+    if (PIND & 0b100) //closed
+      {}
   }
 }
