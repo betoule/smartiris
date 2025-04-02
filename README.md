@@ -83,6 +83,11 @@ after the device has been plugged. Once the device has been identified you can s
 smartiris -t /dev/serial/by-id/{actual_device_id} status
 ```
 
+Mac-OS users should look for the device appearing in:
+```bash
+ls /dev/tty*.*
+```
+
 ### Hardware build
 
 * Schematics is available in directory `schematics`
@@ -188,8 +193,19 @@ print('Wait for completion')
 d.wait()
 ```
 
+Roadmap
+-------
+
+- [ ] Record the timings of the hall sensor trigger
+- [ ] Handle manual operation
+- [ ] Robustify the serial communication
+
 Contributing
 ------------
+
+Main contributors are:
+- Marc Betoule, for the firmware and the python library
+- Fabien Frerot, for the electronics and schematics
 
 Pull requests are welcome! For major changes, please open an issue first to discuss proposed modifications.
 

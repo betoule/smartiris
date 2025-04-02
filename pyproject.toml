@@ -7,6 +7,7 @@ name = "smartiris"
 version = "1.0.0"
 authors = [
   { name="Marc Betoule", email="marc.betoule@lpnhe.in2p3.fr" },
+  { name="Fabien Frerot", email="frerot@lpnhe.in2p3.fr" },
 ]
 description = ""
 readme = "README.md"
