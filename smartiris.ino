@@ -23,6 +23,7 @@ void start_program(uint8_t rb);
 void stop_program(uint8_t rb);
 void get_program(uint8_t rb);
 void status(uint8_t rb);
+void switch_button();
 
 uint32_t duration;
 uint16_t duration_HB;
@@ -44,8 +45,8 @@ Event * active_program;
 uint8_t active_nevent;
 
 Event program[MAX_N_EVENTS];
-Event OpenA[2] = {{20000, 0x0, 0x2}, {(uint16_t)80000, 0x0, 0x2}};
-Event CloseA[2] = {{20000, 0x0, 0x1}, {(uint16_t)80000, 0x0, 0x1}};
+Event OpenA[2] = {{20000, 0x0, 0x2}, {14464, 1, 0x2}};
+Event CloseA[2] = {{20000, 0x0, 0x1}, {14464, 1, 0x1}};
 
 #define STOP_TIMER TCCR1B = 0b00000000
 #define START_TIMER TCCR1B = 0b00000010
@@ -148,6 +149,8 @@ ISR(TIMER1_COMPA_vect){
 
 void loop(){
   client.serve_serial();
+  if (PIND & PD6)
+    switch_button();
 }
 
 void program_pulse(uint8_t rb){
@@ -204,12 +207,7 @@ void get_program(uint8_t rb){
   client.snd((uint8_t*) data, 5, STATUS_OK);
 }
 
-void start_program(uint8_t rb){
-  /* Start the execution of the pulse program
-   */
-  event = 1;
-  active_program = program;
-  active_nevent = n_events;
+void _start_program(){
   // Split that into a high and low resolution part
   OCR1A = program[0].time_LB;
 
@@ -219,6 +217,15 @@ void start_program(uint8_t rb){
   CLEAR_INT;
   ENABLE_INT;
   START_TIMER;
+}
+
+void start_program(uint8_t rb){
+  /* Start the execution of the pulse program
+   */
+  event = 1;
+  active_program = program;
+  active_nevent = n_events;
+  _start_program();
   client.sndstatus(STATUS_OK);
 }
 
@@ -252,6 +259,16 @@ void status(uint8_t rb){
 void switch_button(int button){
   if (event == 0){
     if (PIND & 0b100) //closed
-      {}
+      {
+	active_program = OpenA;
+	active_nevent = 2;
+	_start_program();
+      }
+    else
+      {	active_program = CloseA;
+	active_nevent = 2;
+	_start_program();
+      }
+
   }
 }
