@@ -74,6 +74,26 @@ class SmartIris(bincoms.SerialBC):
         """
         self.pulse(pin, self._ct(pulsewidth_sec))
 
+    def safe_program_pulse(self, pin, pos, timing_sec, retries=2):
+        ''' Encapsulate the program_pulse method, reading back values to ensure integrity of the program
+
+        Args:
+            pin (int): The pin number to pulse
+            pos (int): The position of the pulse in the program
+            timing (float): The timing of the pulse in seconds
+        '''
+        timing_count = self._ct(timing_sec)
+        for i in range(retries):
+            try:
+                self.program_pulse(pin, pos, timing_count)
+                rtiming, rpin = self.get_program(pos)
+                if (rtiming == timing_count) and (rpin == 1<<pin):
+                    return
+            except ValueError:
+                print('Catched communication error')
+                self.flush()
+        raise IOError(f'Corrupted program on device. Asked for ({timing_count}, {1<<pin}) got ({rtiming}, {rpin}) in position {pos}')
+                
     def timed_shutter(self, delay_sec=1e-4, duration_sec=1, port='A', pulsewidth_sec=30e-3, exec=True):
         """Program a sequence to open and close the shutter with specified timing.
 
@@ -88,10 +108,10 @@ class SmartIris(bincoms.SerialBC):
             exec (bool): If false program only. The execution can be triggered later using method start_program.
         """
         pins = port_pins[port]
-        self.program_pulse(pins['open'], 0, self._ct(delay_sec))
-        self.program_pulse(pins['open'], 1, self._ct(delay_sec + pulsewidth_sec))
-        self.program_pulse(pins['close'], 2, self._ct(delay_sec + duration_sec))
-        self.program_pulse(pins['close'], 3, self._ct(delay_sec + duration_sec + pulsewidth_sec))
+        self.safe_program_pulse(pins['open'], 0, delay_sec)
+        self.safe_program_pulse(pins['open'], 1, delay_sec + pulsewidth_sec)
+        self.safe_program_pulse(pins['close'], 2, delay_sec + duration_sec)
+        self.safe_program_pulse(pins['close'], 3, delay_sec + duration_sec + pulsewidth_sec)
         if exec:
             self.start_program()
 

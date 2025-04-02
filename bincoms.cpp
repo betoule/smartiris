@@ -40,8 +40,9 @@ void get_command_names(uint8_t rb){
 }
 
 void setup_bincom(){
-  //Serial.begin(115200);
-  Serial.begin(1000000);
+  Serial.begin(115200);
+  //Serial.begin(1000000);
+  //Serial.begin(460800);
   for (uint8_t i =0; i < NFUNC; i++){
     narg[i] = 0;
     for (char * c = command_names[i*3+1]; *c != 0; c++){
