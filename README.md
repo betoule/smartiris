@@ -107,7 +107,7 @@ smartiris [OPTIONS] COMMAND
 
 #### Options
 - `-t, --tty PORT`  
-  Specify the TTY port (default: `/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0`).
+  Specify the TTY port (default: `""` attempt to autodetect the relevant serial device).
 - `-w, --pulse-width SECONDS`  
   Set the duration of opening/closing pulses in seconds (default: `0.03`).
 - `-p, --port ID`  
@@ -167,7 +167,8 @@ The python library provides direct access to the controler. The control logic wo
 import smartiris
 
 print('Connect to the device')
-d = smartiris.SmartIris(dev='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0')
+# If a single device is connected, there is no need to specify the device
+d = smartiris.SmartIris()
 
 print(' Query the shutter status')
 print(d.status())

@@ -256,19 +256,8 @@ def test():
     parser_status.add_argument('--raw', action='store_true', help='Display raw (unprocess) device status')
 
     args = parser.parse_args()
-
-    if not args.tty:
-        devices = bincoms.find_devices()
-        if len(devices) == 1:
-            device = devices[0]
-        elif len(devices) > 1:
-            raise IOError(f'Several compatible devices found: {devices}. Please specify which one to use with smartiris -t [device_path]')
-        else:
-            raise IOError(f'No compatible device found')
-    else:
-        device = args.tty
         
-    d = SmartIris(dev=device, baudrate=115200, debug=args.verbose, reset=args.reset)
+    d = SmartIris(dev=args.tty, baudrate=115200, debug=args.verbose, reset=args.reset)
     if args.command == 'open':
         d.open_shutter(port=args.port, pulsewidth_sec=args.pulse_width)
     elif args.command == 'close':

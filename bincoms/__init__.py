@@ -83,6 +83,15 @@ def _command_factory(self, f, s, a):
 
 class SerialBC(object):
     def __init__(self, dev='/dev/ttyUSB0', baudrate=115200, debug=False, reset=False):
+        if not dev:
+            devices = find_devices()
+            if len(devices) == 1:
+                dev = devices[0]
+            elif len(devices) > 1:
+                raise IOError(f'Several compatible devices found: {devices}. Please specify which one to use with smartiris -t [device_path]')
+            else:
+                raise IOError(f'No compatible device found')
+
         self.debug=debug
         self._dev = dev
         self._baudrate = baudrate
