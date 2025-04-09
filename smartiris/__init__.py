@@ -252,7 +252,8 @@ def test():
     # Parser for the 'stop' command
     parser_close = subparsers.add_parser('stop', help='Interrupt the execution of the program. The shutter will remain in its current state')
 
-    parser_status = subparsers.add_parser('status', help='Print the shutter driver status')
+    parser_status = subparsers.add_parser('status', help='Print the shutter status')
+    parser_status.add_argument('--raw', action='store_true', help='Display raw (unprocess) device status')
 
     args = parser.parse_args()
 
@@ -275,6 +276,9 @@ def test():
     elif args.command == 'timed':
         d.timed_shutter(port=args.port, pulsewidth_sec=args.pulse_width, duration_sec=args.exposure_time, delay_sec=args.delay)
     elif args.command == 'status':
-        print(d.status())
+        if args.raw:
+            print(d.raw_status())
+        else:
+            print(d.status())
     elif args.command == 'stop':
         print(d.stop_program())

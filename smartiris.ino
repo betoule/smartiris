@@ -94,8 +94,19 @@ void setup(){
   DDRB   = _BV(PB0) | _BV(PB1) | _BV(PB2) | _BV(PB3) | _BV(PB4)| _BV(PB5);
   PORTB  = ~(_BV(PB0) | _BV(PB1) | _BV(PB2) | _BV(PB3) | _BV(PB4)| _BV(PB5));
   
-  // PORTD PIN D2 and D3 
+  // PORTD used as input:
+  // PD2/3 shutter detection line
+  // PD4 free (for TTL ?)
+  // PD5/6 button detection (PCINT21/22)
+  // PD7 /sleep
+  // setup for inputs
+  DDRD &= ~(_BV(PD2) | _BV(PD3) | _BV(PD4) | _BV(5) | _BV(PD6));
+  // Pull-up
+  PORTD = (_BV(PD2) | _BV(PD3) | _BV(PD4) | _BV(5) | _BV(PD6));
+  // Button detection
+  PCMSK2 = _BV(PCINT21) | _BV(PCINT22);
   PCMSK0 = 0b00000000;
+  PCICR = _BV(PCIE2);
   // Setup external interrupt rise for arduino pin 2 and 3 (INT0 and INT1)
   //EICRA |= _BV(ISC11) | _BV(ISC10) | _BV(ISC01) | _BV(ISC00);  
   //SET_TIMER1_CLOCK(TIMER_CLOCK_1);
@@ -147,10 +158,17 @@ ISR(TIMER1_COMPA_vect){
   }
 }
 
-void loop(){
-  client.serve_serial();
-  if (PIND & PD6)
+
+// Button activation handling
+ISR(PCINT2_vect){
+  if (!(PIND & 0b100000))
+    //PINB = _BV(PB5);
     switch_button();
+}
+
+void loop(){
+  // This shunt the arduino loop
+  client.serve_serial();
 }
 
 void program_pulse(uint8_t rb){
@@ -256,19 +274,22 @@ void status(uint8_t rb){
   client.snd((uint8_t*) &data, 4, STATUS_OK);
 }
 
-void switch_button(int button){
+
+void switch_button(){
   if (event == 0){
     if (PIND & 0b100) //closed
       {
+	event = 1;
 	active_program = OpenA;
 	active_nevent = 2;
 	_start_program();
       }
     else
-      {	active_program = CloseA;
+      {
+	event = 1;
+	active_program = CloseA;
 	active_nevent = 2;
 	_start_program();
       }
-
   }
 }
