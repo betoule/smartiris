@@ -42,8 +42,28 @@ class SmartIris(bincoms.SerialBC):
             **keys: Keyword arguments passed to the parent class.
         """
         super().__init__(*args, **keys)
-        self.time_resolution = 0.5e-6
+        self.frequency = self.get_frequency()
 
+    def get_frequency(self):
+        ''' Return the mcu clock frequency. Nominal or calibrated if avaialable'''
+        freq = self.get_clock_calibration()
+        if np.isnan(freq):
+            import warnings
+            warnings.warn('The mcu clock is not calibrated. If you need precise timings consider running "smartiris calibrate".')
+            return 2e6
+        else:
+            return freq
+
+    def calibrate(self, duration_min=10):
+        import smartiris.clock_calibration
+        mcu_data, ntp_data = smartiris.clock_calibration.acquire_clock_data(self, duration=duration_min*60)
+        slope, eslope = smartiris.clock_calibration.clock_calibration_fit(mcu_data['start'], mcu_data['mcu'])
+        print(f'Measured a time scale difference of {(slope-1) * 100:.4f}% (±{eslope*100:.4f}%)')
+        calibrated_frequency = self.frequency * slope
+        print(f'Adjusting frequency from {self.frequency * 1e-6:.6f} MHz to {calibrated_frequency * 1e-6:.6f} MHz')
+        self.set_clock_calibration(calibrated_frequency)
+        self.frequency = calibrated_frequency
+        
     def _ct(self, seconds):
         """Convert a duration in seconds to a microcontroller timer count.
 
@@ -53,7 +73,7 @@ class SmartIris(bincoms.SerialBC):
         Returns:
             int: The number of timer counts, rounded to the nearest integer.
         """
-        return int(np.round(seconds / self.time_resolution))
+        return int(np.round(seconds * self.frequency))
 
 #    def async_packet_read(self):
 #        """Read and unpack an asynchronous response packet from the device.
@@ -261,8 +281,13 @@ def test():
     parser_status = subparsers.add_parser('status', help='Print the shutter status')
     parser_status.add_argument('--raw', action='store_true', help='Display raw (unprocess) device status')
 
-    parser_status = subparsers.add_parser('disable_buttons', help='Disable device buttons for the session to avoid interference with remote controle.')
-    parser_status = subparsers.add_parser('enable_buttons', help='Re-enable device buttons for the session, They will have precedence over remote operations.')
+    parser_disable = subparsers.add_parser('disable_buttons', help='Disable device buttons for the session to avoid interference with remote controle.')
+    parser_enable = subparsers.add_parser('enable_buttons', help='Re-enable device buttons for the session, They will have precedence over remote operations.')
+    parser_calibrate = subparsers.add_parser('calibrate', help='Run time calibration procedure')
+    parser_calibrate.add_argument(
+        '-d', '--duration', type=float, default=10,
+        help='Duration of the calibration procedure (in minutes)')
+    
     
     args = parser.parse_args()
         
@@ -284,3 +309,5 @@ def test():
         d.disable_buttons()
     elif args.command == 'enable_buttons':
         d.enable_buttons()
+    elif args.command == 'calibrate':
+        d.calibrate(args.duration)

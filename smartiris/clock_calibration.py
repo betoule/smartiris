@@ -3,25 +3,11 @@ import time
 import numpy as np
 import smartiris
 import matplotlib.pyplot as plt
+import tqdm
 
 server="pool.ntp.org"
 client = ntplib.NTPClient()
         
-#device = smartiris.SmartIris()
-
-def mcu_tic():
-    start = time.time()
-    devtime = device.get_time()
-    stop = time.time()
-    return start, devtime/2e6, stop
-
-def ntp_tic():
-    start = time.time()
-    devtime = device.get_time()
-    response = client.request(server, version=4)
-    stop = time.time()
-    return start, response.tx_time, stop
-
 def acquire_clock_data(device, duration=600, ntp=0, interval=0.1):
     ''' Acquire clock synchronisation data from the host and mcu.
     
@@ -44,25 +30,39 @@ def acquire_clock_data(device, duration=600, ntp=0, interval=0.1):
     mcu_data: numpy record array
     ntp_data: numpy record array
     '''
+    def mcu_tic():
+        start = time.time()
+        devtime = device.get_time()
+        stop = time.time()
+        return start, devtime/device.frequency, stop
+
+    def ntp_tic():
+        start = time.time()
+        devtime = device.get_time()
+        response = client.request(server, version=4)
+        stop = time.time()
+        return start, response.tx_time, stop
+
     mcu_data = []
     ntp_data = []
     last_ntp = 0
     start = time.time()
-    device._start_timer()    
-    while(time.time() - start < duration):
-        
-        mcu_data.append(mcu_tic())
-        elif not ntp:
-            # No need to continue longer
-            break
-        if ntp and ((time - last_ntp) > ntp):
-            try:
-                ntp_data.append(ntp_tic())
-            except:
-                pass
-        time.sleep(interval)
-    return (np.rec.fromrecord(mcu_data, names=['start', 'mcu', 'stop']),
-            np.rec_fromrecord(mcu_data, names=['start', 'nntp', 'stop']))
+    device._start_timer()
+    total_steps = int(duration / interval)
+    with tqdm.tqdm(total=total_steps, desc="Clock calibration", unit="s") as pbar:
+        while(time.time() - start < duration):
+            mcu_data.append(mcu_tic())
+            if (ntp != 0) and ((time - last_ntp) > ntp):
+                try:
+                    ntp_data.append(ntp_tic())
+                except:
+                    pass
+            progress = int(((time.time() - start) / duration) * total_steps)
+            pbar.n = min(progress, total_steps)
+            pbar.refresh()
+            time.sleep(interval)
+    return (np.rec.fromrecords(mcu_data, names=['start', 'mcu', 'stop']),
+            np.rec.fromrecords(mcu_data, names=['start', 'nntp', 'stop']))
 
 
 def save(mcu_data, ntp_data, filename='timing.npz'):
