@@ -46,7 +46,7 @@ Example output for two closed and connected shutters:
 {'shutter_A': 'closed', 'shutter_B': 'closed', 'busy': False}
 ```
 
-Unconnected shutters appear as `open`. The same is true of partly open shutters.
+Unconnected shutters appear as `closed`. Partly open shutters may appear as closed or open depending on the sensor location on the device.
 
 ### Troubleshooting
 
@@ -71,7 +71,7 @@ Errors of the kind:
 ```
 FileNotFoundError: [Errno 2] No such file or directory: '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0'
 ```
-occur when the serial device is not at the default location. You need to identify the path to the device file by looking at appearing files in:
+occur when the serial device is not at the spectified location. You need to identify the path to the device file by looking at appearing files in:
 ```bash
 ls /dev/serial/by-id/
 #plug the device
@@ -200,11 +200,21 @@ Roadmap
 - [ ] Handle manual operation
 - [ ] Robustify the serial communication
 
+Release History
+---------------
+### v0.2
+- Handle button event
+- Pull-up sensor lines to make unconnected shutter consistently appear as close
+- Auto-detect the device port
+
+### v0.1
+First release in use during the april 2025 OHP campaign
+
 Contributing
 ------------
 
 Main contributors are:
-- Marc Betoule, for the firmware and the python library
+- Marc Betoule, for the firmware and the host python library
 - Fabien Frerot, for the electronics and schematics
 
 Pull requests are welcome! For major changes, please open an issue first to discuss proposed modifications.
