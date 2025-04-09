@@ -45,8 +45,13 @@ Event * active_program;
 uint8_t active_nevent;
 
 Event program[MAX_N_EVENTS];
-Event OpenA[2] = {{20000, 0x0, 0x2}, {14464, 1, 0x2}};
-Event CloseA[2] = {{20000, 0x0, 0x1}, {14464, 1, 0x1}};
+
+// Those are 4 builtin programs to open and close the two shutters
+Event OpenA[2] = {{20000, 0x0, 0b10}, {14464, 1, 0b10}};
+Event CloseA[2] = {{20000, 0x0, 0b1}, {14464, 1, 0b1}};
+Event OpenB[2] = {{20000, 0x0, 0b1000}, {14464, 1, 0b1000}};
+Event CloseB[2] = {{20000, 0x0, 0b100}, {14464, 1, 0b100}};
+
 
 #define STOP_TIMER TCCR1B = 0b00000000
 #define START_TIMER TCCR1B = 0b00000010
@@ -161,9 +166,8 @@ ISR(TIMER1_COMPA_vect){
 
 // Button activation handling
 ISR(PCINT2_vect){
-  if (!(PIND & 0b100000))
-    //PINB = _BV(PB5);
-    switch_button();
+  //PINB = _BV(PB5);
+  switch_button();
 }
 
 void loop(){
@@ -276,7 +280,8 @@ void status(uint8_t rb){
 
 
 void switch_button(){
-  if (event == 0){
+  //if (event == 0){
+  if (!(PIND & 0b100000)){//buttonA
     if (PIND & 0b100) //closed
       {
 	event = 1;
@@ -288,6 +293,22 @@ void switch_button(){
       {
 	event = 1;
 	active_program = CloseA;
+	active_nevent = 2;
+	_start_program();
+      }
+  }
+  else if (!(PIND & 0b1000000)){//buttonB
+    if (PIND & 0b1000) //closed
+      {
+	event = 1;
+	active_program = OpenB;
+	active_nevent = 2;
+	_start_program();
+      }
+    else
+      {
+	event = 1;
+	active_program = CloseB;
 	active_nevent = 2;
 	_start_program();
       }
