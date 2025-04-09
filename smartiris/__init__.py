@@ -22,6 +22,7 @@ import numpy as np
 import struct
 import time
 
+
 class SmartIris(bincoms.SerialBC):
     """A class to control an iris blade shutter via serial communication.
 
@@ -214,7 +215,7 @@ def test():
     parser = argparse.ArgumentParser(
         description='Operate an iris blade shutter')
     parser.add_argument(
-        '-t', '--tty', default='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AQ01L27T-if00-port0',
+        '-t', '--tty', default='',
         help='link to a specific tty port')
     parser.add_argument(
         '-w', '--pulse-width', default=30e-3,
@@ -255,7 +256,18 @@ def test():
 
     args = parser.parse_args()
 
-    d = SmartIris(dev=args.tty, baudrate=1000000, debug=args.verbose, reset=args.reset)
+    if not args.tty:
+        devices = bincoms.find_devices()
+        if len(devices) == 1:
+            device = devices[0]
+        elif len(devices) > 1:
+            raise IOError(f'Several compatible devices found: {devices}. Please specify which one to use with smartiris -t [device_path]')
+        else:
+            raise IOError(f'No compatible device found')
+    else:
+        device = args.tty
+        
+    d = SmartIris(dev=device, baudrate=115200, debug=args.verbose, reset=args.reset)
     if args.command == 'open':
         d.open_shutter(port=args.port, pulsewidth_sec=args.pulse_width)
     elif args.command == 'close':

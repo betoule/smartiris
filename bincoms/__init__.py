@@ -40,9 +40,20 @@ status_message = ['Action performed successfully',
                   'Not used for now',
                   'The provided arguments are outside the allowed range']
 
-def lookup():
-    import glob
-
+def find_devices():
+    """Discover all bincom compatible devices."""
+    import serial.tools.list_ports
+    ports = serial.tools.list_ports.comports()
+    devices = []
+    for port in ports:
+        if port.vid is not None:
+            try:
+                device = SerialBC(dev=port.device)
+                devices.append(port.device)
+            except ValueError:
+                pass
+    return devices
+            
 def _command_factory(self, f, s, a):
     def func(self, *args):
         try:
