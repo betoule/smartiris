@@ -201,11 +201,14 @@ void program_pulse(uint8_t rb){
    * n_events: (Byte) the slot number in the program between 0 and MAX_N_EVENTS - 1
    * duration: (int) the timing of the switch in counts since the launch of the program. A count as a value of 0.5e-6 seconds.
    */
-  pin = *((uint8_t *) (client.read_buffer + rb));
-  n_events = *((uint8_t *) (client.read_buffer + rb+1));
+  client.readn(&rb, &pin, 1);
+  client.readn(&rb, &n_events, 1);
   // We receive the duration as timer count with a resolution of
   // 0.5e-6s
-  duration = *((uint32_t *) (client.read_buffer + rb + 2));
+  client.readn(&rb, (uint8_t*) &duration, 4);
+  //pin = *((uint8_t *) (client.read_buffer + rb));
+  //n_events = *((uint8_t *) (client.read_buffer + rb+1));
+  //duration = *((uint32_t *) (client.read_buffer + rb + 2));
   if (n_events >= MAX_N_EVENTS){
     client.snd((uint8_t*) &duration, 4, VALUE_ERROR);
     return;

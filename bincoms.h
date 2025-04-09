@@ -132,7 +132,13 @@ struct Com{
     wait = 3;
     rb = re;
   }
-  
+
+  void readn(uint8_t * rb, uint8_t * data, uint8_t n){
+    for (uint8_t i=0; i < n; i++){
+      data[i] = read_buffer[*rb];
+      (*rb)++;
+    }
+  }
 };
 
 #if defined(HAVE_HWSERIAL0)

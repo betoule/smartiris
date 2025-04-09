@@ -211,12 +211,12 @@ Roadmap
 
 Release History
 ---------------
-### v0.2
+### v0.2.0
 - Handle button event
 - Pull-up sensor lines to make unconnected shutter consistently appear as close
 - Auto-detect the device port
 
-### v0.1
+### v0.1.0
 First release in use during the april 2025 OHP campaign
 
 Contributing
