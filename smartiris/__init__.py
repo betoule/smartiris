@@ -184,6 +184,12 @@ class SmartIris(bincoms.SerialBC):
         """
         while self.status()['busy']:
             time.sleep(0.1)
+
+    def enable_buttons(self):
+        self._set_interrupt_mask((1<<5 | 1<<6))
+
+    def disable_buttons(self):
+        self._set_interrupt_mask(0)
             
 pin_map = {8: 0,
            9: 1,
@@ -255,6 +261,9 @@ def test():
     parser_status = subparsers.add_parser('status', help='Print the shutter status')
     parser_status.add_argument('--raw', action='store_true', help='Display raw (unprocess) device status')
 
+    parser_status = subparsers.add_parser('disable_buttons', help='Disable device buttons for the session to avoid interference with remote controle.')
+    parser_status = subparsers.add_parser('enable_buttons', help='Re-enable device buttons for the session, They will have precedence over remote operations.')
+    
     args = parser.parse_args()
         
     d = SmartIris(dev=args.tty, baudrate=115200, debug=args.verbose, reset=args.reset)
@@ -271,3 +280,7 @@ def test():
             print(d.status())
     elif args.command == 'stop':
         print(d.stop_program())
+    elif args.command == 'disable_buttons':
+        d.disable_buttons()
+    elif args.command == 'enable_buttons':
+        d.enable_buttons()

@@ -23,6 +23,7 @@ void start_program(uint8_t rb);
 void stop_program(uint8_t rb);
 void get_program(uint8_t rb);
 void status(uint8_t rb);
+void set_interrupt_mask(uint8_t rb);
 void switch_button();
 
 uint32_t duration;
@@ -44,9 +45,10 @@ typedef struct {
 Event * active_program;
 uint8_t active_nevent;
 
+// This store t
 Event program[MAX_N_EVENTS];
 
-// Those are 4 builtin programs to open and close the two shutters
+// Those are 4 builtin programs to open and close the two shutters when the button are activated
 Event OpenA[2] = {{20000, 0x0, 0b10}, {14464, 1, 0b10}};
 Event CloseA[2] = {{20000, 0x0, 0b1}, {14464, 1, 0b1}};
 Event OpenB[2] = {{20000, 0x0, 0b1000}, {14464, 1, 0b1000}};
@@ -61,7 +63,7 @@ Event CloseB[2] = {{20000, 0x0, 0b100}, {14464, 1, 0b100}};
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+5;
+const uint8_t NFUNC = 2+6;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -74,6 +76,7 @@ void (*func[NFUNC])(uint8_t rb) =
    stop_program,
    get_program,
    status,
+   set_interrupt_mask,
   };
 
 const char* command_names[NFUNC*3] =
@@ -85,6 +88,7 @@ const char* command_names[NFUNC*3] =
    "stop_program", "", "",
    "get_program", "B", "IB",
    "raw_status", "", "BBBB",
+   "_set_interrupt_mask", "B", "",
   };
 
 
@@ -178,6 +182,15 @@ ISR(PCINT2_vect){
 void loop(){
   // This shunt the arduino loop
   client.serve_serial();
+}
+
+void set_interrupt_mask(uint8_t rb){
+  /* This function can be used to enable/disable the button interrupt
+   *
+   * The function read the mask as 1 uint8_t argument from the communication buffer:
+   */
+    PCMSK2 = *((uint8_t *) (client.read_buffer + rb));
+    client.sndstatus(STATUS_OK);
 }
 
 void program_pulse(uint8_t rb){

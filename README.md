@@ -48,6 +48,8 @@ Example output for two closed and connected shutters:
 
 Unconnected shutters appear as `closed`. Partly open shutters may appear as closed or open depending on the sensor location on the device.
 
+The button can be used to switch the shutters on and off. They have precedence upon the software control, meaning that if a timed exposure as been programmed, pressing any of the button will interrupt the program and close or open the corresponding shutter. If needed button can be deactivated by software.
+
 ### Troubleshooting
 
 #### Permission errors 
@@ -142,6 +144,12 @@ smartiris [OPTIONS] COMMAND
 - `status`  
   Display the current status of the shutter driver.  
   Example: `smartiris status`
+
+- `disable_button`  
+  Disable the on-board buttons to avoid interference with remote controle
+
+- `enable_button`  
+  Re-enable the on-board buttons. They will have precedence over remote operations
 
 #### Examples
 - Open the shutter with a custom pulse width on port B:  
