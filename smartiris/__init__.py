@@ -261,9 +261,9 @@ def test():
         if len(devices) == 1:
             device = devices[0]
         elif len(devices) > 1:
-            print(f'Several compatible devices found: {devices}. Please specify which one to use with smartiris -t [device_path]')
+            raise IOError(f'Several compatible devices found: {devices}. Please specify which one to use with smartiris -t [device_path]')
         else:
-            print(f'No compatible device found')
+            raise IOError(f'No compatible device found')
     else:
         device = args.tty
         
