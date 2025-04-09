@@ -34,7 +34,7 @@ uint8_t pin;
 // The number of programmable events
 const uint8_t MAX_N_EVENTS=4;
 uint8_t n_events;
-uint8_t event;
+uint8_t event = 0;
 typedef struct {
   uint16_t time_LB;
   uint16_t time_HB;
@@ -144,6 +144,13 @@ ISR(TIMER1_OVF_vect){
   timeHB++;
 }
 
+void _stop_program(){
+  STOP_TIMER;
+  DISABLE_INT;
+  event = 0;
+  PORTB = 0;
+}
+
 // Timer Interruption handling
 ISR(TIMER1_COMPA_vect){
   // Emulate 32 bit resolution by executing the code only if the high
@@ -152,9 +159,7 @@ ISR(TIMER1_COMPA_vect){
   if (timeHB == active_program[event-1].time_HB){
     PINB = active_program[event-1].pin;
     if (event == active_nevent){
-      STOP_TIMER;
-      DISABLE_INT;
-      event = 0;
+      _stop_program();
     }
     else{
       OCR1A = active_program[event].time_LB;
@@ -231,7 +236,7 @@ void get_program(uint8_t rb){
 
 void _start_program(){
   // Split that into a high and low resolution part
-  OCR1A = program[0].time_LB;
+  OCR1A = active_program[0].time_LB;
 
   // Reset the timer
   timeHB=0;
@@ -254,10 +259,7 @@ void start_program(uint8_t rb){
 void stop_program(uint8_t rb){
   /* Stop the program exectution
    */
-  STOP_TIMER;
-  DISABLE_INT;
-  event = 0;
-  PORTB = 0;
+  _stop_program();
   client.sndstatus(STATUS_OK);
 }
 
@@ -274,13 +276,15 @@ void status(uint8_t rb){
   data[0] = PINB;
   data[1] = PIND;
   data[2] = event;
-  data[3] = n_events;
+  //data[3] = n_events;
+  data[3] = active_nevent;
   client.snd((uint8_t*) &data, 4, STATUS_OK);
 }
 
 
 void switch_button(){
   //if (event == 0){
+  _stop_program();
   if (!(PIND & 0b100000)){//buttonA
     if (PIND & 0b100) //closed
       {
