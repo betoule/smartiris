@@ -14,6 +14,7 @@
 
 #include <Arduino.h>
 #include "bincoms.h"
+#include <EEPROM.h>
 
 /* The main fonction of the API. Send a pulse of a given duration on
    the given line.
@@ -24,6 +25,10 @@ void stop_program(uint8_t rb);
 void get_program(uint8_t rb);
 void status(uint8_t rb);
 void set_interrupt_mask(uint8_t rb);
+void start_timer(uint8_t rb);
+void get_time(uint8_t rb);
+void get_clock_calibration(uint8_t rb);
+void set_clock_calibration(uint8_t rb);
 void switch_button();
 
 uint32_t duration;
@@ -63,7 +68,7 @@ Event CloseB[2] = {{20000, 0x0, 0b100}, {14464, 1, 0b100}};
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+6;
+const uint8_t NFUNC = 2+10;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -77,6 +82,10 @@ void (*func[NFUNC])(uint8_t rb) =
    get_program,
    status,
    set_interrupt_mask,
+   start_timer,
+   get_time,
+   get_clock_calibration,
+   set_clock_calibration,
   };
 
 const char* command_names[NFUNC*3] =
@@ -89,6 +98,10 @@ const char* command_names[NFUNC*3] =
    "get_program", "B", "IB",
    "raw_status", "", "BBBB",
    "_set_interrupt_mask", "B", "",
+   "_start_timer", "", "",
+   "get_time", "", "I",
+   "get_clock_calibration", "", "f",
+   "set_clock_calibration", "f", "",
   };
 
 
@@ -272,6 +285,28 @@ void start_program(uint8_t rb){
   client.sndstatus(STATUS_OK);
 }
 
+void start_timer(uint8_t rb){
+  /* Start the timer execution without program
+    (Usually used for clock calibration purpose)
+   */
+  _stop_program();
+  // Reset the timer
+  timeHB=0;
+  TCNT1=0;
+  CLEAR_INT;
+  // Enable timer overflow but not the other instructions
+  TIMSK1 = 0b00000001;
+  START_TIMER;
+  client.sndstatus(STATUS_OK);
+}
+
+void get_time(uint8_t rb){
+  duration = timeHB;
+  duration <<= 16;
+  duration += TCNT1;
+  client.snd((uint8_t*) &duration, 4, STATUS_OK);
+}
+
 void stop_program(uint8_t rb){
   /* Stop the program exectution
    */
@@ -295,6 +330,19 @@ void status(uint8_t rb){
   //data[3] = n_events;
   data[3] = active_nevent;
   client.snd((uint8_t*) &data, 4, STATUS_OK);
+}
+
+void get_clock_calibration(uint8_t rb){
+  float calibration_constant = 2e6;
+  EEPROM.get(0, calibration_constant);
+  client.snd((uint8_t*) &calibration_constant, 4, STATUS_OK);
+}
+
+void set_clock_calibration(uint8_t rb){
+  float calibration_constant = 2e6;
+  client.readn(&rb, (uint8_t*) &calibration_constant, 4);
+  EEPROM.put(0, calibration_constant);
+  client.sndstatus(STATUS_OK);
 }
 
 
