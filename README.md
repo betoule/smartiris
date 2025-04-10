@@ -6,17 +6,19 @@ independent Iris shutters by
 [Thorlabs](https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=6619&pn=SHB1T#7096). This
 project offers an alternative solution that avoids heat dissipation,
 sending only the necessary current pulses to open or close the
-shutter. This alternative is suitable for low actuation rates (<1Hz).
+shutter. This alternative is suitable for low actuation rates (~1Hz), where timing accuracy matters.
 
 Features
 --------
 
 * Easy-to-use USB interface for power and control
 * Open-source design for customization
-* Independently controlled channels for two Iris shutters
+* Programmable coordinated channels for two Iris shutters
 * Python library
 * Improved energy efficiency by avoiding continuous heat dissipation
-* Precise timing of the iris movements
+* Internal clock calibration for accurate timings
+* Half-microsecond resolution on timings
+* Timing of the iris movements via sensor feedback
 
 Getting Started
 ---------------
@@ -166,7 +168,9 @@ smartiris [OPTIONS] COMMAND
   smartiris stop
   smartiris status
   ```
-
+- Run a 1 minute calibration of the internal clock of the device for accurate timing:  
+  `smartiris calibrate -d 1`
+  
 ### Python library
 
 The python library provides direct access to the controler. The control logic works as follows: a short program is written to the controler specifying which pins to operate at specific timings to energize the activation coils of the shutters. The timing are specified with a resolution of 0.5μs and can extend over a duration of up to 17 minutes. The high level functions are `open_shutter` and `close_shutter` which execute a two step program (energize the coil for a given duration then release) and `timed_shutter` which executes a 4 step program chaining the two operations separated by a given interval. All writen program executions can be prevented by specifying `exec=False` then triggered latter at will by calls to `start_program`. The use of delayed execution avoid cummulating random delays in the USB communication and offer the best synchronisation timing between the host and the device. Here is a complete example illustrating the various functions of the library:
@@ -211,6 +215,9 @@ Roadmap
 
 Release History
 ---------------
+### v0.3.0
+- Implement a calibration procedure for the MCU clock enabling accurate timings
+
 ### v0.2.0
 - Handle button event
 - Pull-up sensor lines to make unconnected shutter consistently appear as close
