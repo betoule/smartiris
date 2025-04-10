@@ -107,7 +107,7 @@ class SmartIris(bincoms.SerialBC):
         for i in range(retries):
             try:
                 self.program_pulse(pin, pos, timing_count)
-                rtiming, rpin = self.get_program(pos)
+                rtiming, rpin = self.get_program(pos, 0)
                 if (rtiming == timing_count) and (rpin == 1<<pin):
                     return
             except ValueError:
@@ -176,7 +176,16 @@ class SmartIris(bincoms.SerialBC):
         Reads and displays the program steps (up to 4) from the device.
         """
         for i in range(4):
-            print(self.get_program(i))
+            print(self.get_program(i, 0))
+
+    def read_timing_record(self):
+        """Read the record of sensor detection timing.
+        """
+        nrecords = self.status()['events_recorded']
+        def convert(i):
+            timing, pin = self.get_program(i, 1)
+            return timing/self.frequency, ['', 'sensorA', 'sensorB'][pin]
+        return [convert(i) for i in range(nrecords)]
 
     def status(self):
         """Retrieve the current status of the shutter driver.
@@ -186,14 +195,16 @@ class SmartIris(bincoms.SerialBC):
                 - 'shutter_A': State of shutter A ('open' or 'closed').
                 - 'shutter_B': State of shutter B ('open' or 'closed').
                 - 'busy': Boolean indicating if a program is running.
+                - 'events_recorded': The number of recorded sensor events.
         """
-        com_port, read_port, program_cursor, program_length = self.raw_status()
+        com_port, read_port, program_cursor, program_length, nrecords = self.raw_status()
         if self.debug:
-            print(f'{com_port=}, {read_port=}, {program_cursor=},{program_length=}')
+            print(f'{com_port=}, {read_port=}, {program_cursor=},{program_length=}, {nrecords=}')
         status = {
             'shutter_A': 'closed' if read_port & 0b100 else 'open',
             'shutter_B': 'closed' if read_port & 0b1000 else 'open',
             'busy': program_cursor != 0,
+            'events_recorded': nrecords,
         }
         return status
 
@@ -287,7 +298,7 @@ def test():
     parser_calibrate.add_argument(
         '-d', '--duration', type=float, default=10,
         help='Duration of the calibration procedure (in minutes)')
-    
+    parser_read = subparsers.add_parser('read', help='Report measured timings of sensor events')
     
     args = parser.parse_args()
         
@@ -311,3 +322,9 @@ def test():
         d.enable_buttons()
     elif args.command == 'calibrate':
         d.calibrate(args.duration)
+    elif args.command == 'read':
+        record = d.read_timing_record()
+        print(f'Recorded sensor events: {record}')
+        if len(record) == 2:
+            exptime = record[1][0] - record[0][0]
+            print(f'Measured exposure time: {exptime} s')

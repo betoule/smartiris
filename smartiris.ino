@@ -37,8 +37,11 @@ uint16_t duration_LB;
 uint16_t timeHB;
 uint8_t pin;
 
-// The number of programmable events
-const uint8_t MAX_N_EVENTS=4;
+// The maximum number of programmable control pin changes
+const uint8_t MAX_N_EVENTS=16;
+// The maximum number of recordable events
+const uint8_t MAX_N_RECORDS=16; 
+
 uint8_t n_events;
 uint8_t event = 0;
 typedef struct {
@@ -50,7 +53,7 @@ typedef struct {
 Event * active_program;
 uint8_t active_nevent;
 
-// This store t
+// This store the program
 Event program[MAX_N_EVENTS];
 
 // Those are 4 builtin programs to open and close the two shutters when the button are activated
@@ -59,12 +62,29 @@ Event CloseA[2] = {{20000, 0x0, 0b1}, {14464, 1, 0b1}};
 Event OpenB[2] = {{20000, 0x0, 0b1000}, {14464, 1, 0b1000}};
 Event CloseB[2] = {{20000, 0x0, 0b100}, {14464, 1, 0b100}};
 
+// To record sensor event timings
+Event sensor_timing_record[MAX_N_RECORDS];
+uint8_t n_record = 0;
 
+// Generic record interrupt handler. This interrupt handler need to
+// handle timing rollover internally because it could mask the overflow
+// interrupt and record incorrect timing because of that.
+#define INTERRUPT_HANDLER(line)                                    \
+  sensor_timing_record[n_record].time_LB = TCNT1;                   \
+  if ((TIFR1 & 0b1) && (sensor_timing_record[n_record].time_LB < 10)){\
+    timeHB++;							   \
+    TIFR1 |= _BV(TOV1);						   \
+  }								   \
+  sensor_timing_record[n_record].pin = line;			   \
+  sensor_timing_record[n_record].time_HB = timeHB;                  \
+  if (n_record < MAX_N_RECORDS - 1) n_record++;                    \
+  
+// Macros to start and stop the 16-bit timer
 #define STOP_TIMER TCCR1B = 0b00000000
 #define START_TIMER TCCR1B = 0b00000010
-// enable overflow and compare match A interupts
+// enable overflow and compare match A interupts on the 16 bit timer
 #define ENABLE_INT TIMSK1 = 0b00000011
-#define ENABLE_INTB TIMSK1 = 0b00000101
+// Disable overflow and compare interrupts on the 16bit timer
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
@@ -95,8 +115,8 @@ const char* command_names[NFUNC*3] =
    "program_pulse", "BBI", "I",
    "start_program", "", "",
    "stop_program", "", "",
-   "get_program", "B", "IB",
-   "raw_status", "", "BBBB",
+   "get_program", "BB", "IB",
+   "raw_status", "", "BBBBB",
    "_set_interrupt_mask", "B", "",
    "_start_timer", "", "",
    "get_time", "", "I",
@@ -129,6 +149,8 @@ void setup(){
   PCMSK2 = _BV(PCINT21) | _BV(PCINT22);
   PCMSK0 = 0b00000000;
   PCICR = _BV(PCIE2);
+  // Setup external interrupt as pin change interrupt for arduino pin D2 and D3
+  EICRA = 0b0101;
   // Setup external interrupt rise for arduino pin 2 and 3 (INT0 and INT1)
   //EICRA |= _BV(ISC11) | _BV(ISC10) | _BV(ISC01) | _BV(ISC00);  
   //SET_TIMER1_CLOCK(TIMER_CLOCK_1);
@@ -164,6 +186,7 @@ ISR(TIMER1_OVF_vect){
 void _stop_program(){
   STOP_TIMER;
   DISABLE_INT;
+  EIMSK = 0b0;
   event = 0;
   PORTB = 0;
 }
@@ -190,6 +213,15 @@ ISR(TIMER1_COMPA_vect){
 ISR(PCINT2_vect){
   //PINB = _BV(PB5);
   switch_button();
+}
+
+// sensor detection on arduino pin D2
+ISR(INT0_vect){
+  INTERRUPT_HANDLER(0b1)
+}
+// sensor detection on arduino pin D3
+ISR(INT1_vect){
+  INTERRUPT_HANDLER(0b10)
 }
 
 void loop(){
@@ -246,20 +278,26 @@ void program_pulse(uint8_t rb){
 void get_program(uint8_t rb){
   /* Query a slot of the pulse program
    *
-   * The function reads 1 arguments from the communication buffer:
+   * The function reads 2 arguments from the communication buffer:
    * i: (Byte) the slot number in the program between 0 and MAX_N_EVENTS - 1
-   *
+   * p: (Byte) the index of the program to read
    * It returns 2 values to the communication buffer:
    * duration: (Int) the timing of the pulse in slot i (in counts)
    * pin: (Byte) the index of the pin switched in the PORTB
    */
   uint8_t data[5];
   uint8_t i = *((uint8_t *) (client.read_buffer + rb));
-  duration = program[i].time_HB;
+  uint8_t program_num = *((uint8_t *) (client.read_buffer + (rb + 1)));
+  Event * program_slot;
+  if (program_num == 1)
+    program_slot = sensor_timing_record;
+  else
+    program_slot = program;
+  duration = program_slot[i].time_HB;
   duration <<= 16;
-  duration += program[i].time_LB;
+  duration += program_slot[i].time_LB;
   *((uint32_t*)(data)) = duration;
-  data[4] = program[i].pin;
+  data[4] = program_slot[i].pin;
   client.snd((uint8_t*) data, 5, STATUS_OK);
 }
 
@@ -271,6 +309,8 @@ void _start_program(){
   timeHB=0;
   TCNT1=0;
   CLEAR_INT;
+  n_record=0;
+  EIMSK = 0b11;
   ENABLE_INT;
   START_TIMER;
 }
@@ -322,14 +362,16 @@ void status(uint8_t rb){
    * PIND the state of the 8 GPIO pins in Port D
    * event the current index of the slot in program
    * n_events the length of the program
+   * the number of recorded events
    */
-  uint8_t data[4];
+  uint8_t data[5];
   data[0] = PINB;
   data[1] = PIND;
   data[2] = event;
   //data[3] = n_events;
   data[3] = active_nevent;
-  client.snd((uint8_t*) &data, 4, STATUS_OK);
+  data[4] = n_record;
+  client.snd((uint8_t*) &data, 5, STATUS_OK);
 }
 
 void get_clock_calibration(uint8_t rb){
