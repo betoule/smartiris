@@ -72,7 +72,7 @@ def load(filename='timing.npz'):
     data = np.load(filename)
     return data['mcu_data'], data['ntp_data']
 
-def clock_calibration_fit(t1, t2, show=False, axes=None):
+def clock_calibration_fit(t1, t2, show=False, axes=None, **keys):
     x = t1 - t1.min()
     y = t2 - t2.min()
     p, cov = np.polyfit(x, y, 1, cov=True)
@@ -83,29 +83,35 @@ def clock_calibration_fit(t1, t2, show=False, axes=None):
             axes = plt.gcf().subplots(2,1,sharex=True)
         ax1, ax2 = axes
 
-        ax1.plot(x, y-x, 'o')
+        ax1.plot(x, y-x, ',', **keys)
         v = [x.min(), x.max()]
-        ax1.plot(v, np.polyval(p, v)-np.array(v), 'k-', label=f'{p[0]:.5f}±{eslope:.5f}')
-        ax1.legend()
-        ax2.plot(x, res, 'o', label=f'{res.std()*1000:.2f}ms')
-        ax2.legend()
+        ax1.plot(v, np.polyval(p, v)-np.array(v), 'k-', label=rf'$\alpha={p[0]-1:.6f}\pm{eslope:.6f}$', **keys)
+        ax1.legend(frameon=False)
+        ax2.plot(x, res*1000, ',', label=rf'$\sigma={res.std()*1000:.2f}$ ms', **keys)
+        ax2.legend(frameon=False)
         ax2.set_xlabel('host clock [s]')
         ax1.set_ylabel('mcu - host [s]')
-        ax2.set_ylabel(f'mcu - {p[0]:.3f} host [s]')
+        ax2.set_ylabel(rf'mcu - $(1+\alpha)$ host [ms]')
+        ax2.axhline(0, color='k')
         return p[0], eslope, axes 
     else:
         return p[0], eslope
 
 if __name__ == '__main__':
-    
+
+    plt.rc('axes.spines', right=False, top=False)
+    plt.rc('text', usetex=True)
+
     mcu_data, ntp_data = load('timing3.npz')
     
     d1 = mcu_data[:mcu_data['mcu'].argmax()+1]
     d2 = mcu_data[mcu_data['mcu'].argmax()+1:]
-    slope1, eslope1, axes = clock_calibration_fit(d1['start'], d1['mcu'], show=True)
-    slope2, eslope2, axes = clock_calibration_fit(d2['start'], d2['mcu'], show=True, axes=axes)
+    slope1, eslope1, axes = clock_calibration_fit(d1['start'], d1['mcu'], show=True, color='#1b9e77')
+    slope2, eslope2, axes = clock_calibration_fit(d2['start'], d2['mcu'], show=True, axes=axes, color='#d95f02')
 
     calibrated_frequency = 2e6 * slope1
+    plt.tight_layout()
+    plt.savefig('doc/clock_calibration.png', dpi=300)
     
 #axes = calib(mcu_data['start'] - mcu_data['start'].min(), mcu_data['mcu'] - mcu_data['mcu'].min())
 #calib(ntp_data['start'] - ntp_data['start'].min(), ntp_data['ntp'] - ntp_data['ntp'].min(), axes)

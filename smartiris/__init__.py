@@ -175,8 +175,8 @@ class SmartIris(bincoms.SerialBC):
 
         Reads and displays the program steps (up to 4) from the device.
         """
-        for i in range(4):
-            print(self.get_program(i, 0))
+        program_length = self.status()['program_length']
+        return [self.get_program(i, 0) for i in range(program_length)]
 
     def read_timing_record(self):
         """Read the record of sensor detection timing.
@@ -195,6 +195,7 @@ class SmartIris(bincoms.SerialBC):
                 - 'shutter_A': State of shutter A ('open' or 'closed').
                 - 'shutter_B': State of shutter B ('open' or 'closed').
                 - 'busy': Boolean indicating if a program is running.
+                - 'program_length': number of pin changes in the program.
                 - 'events_recorded': The number of recorded sensor events.
         """
         com_port, read_port, program_cursor, program_length, nrecords = self.raw_status()
@@ -204,6 +205,7 @@ class SmartIris(bincoms.SerialBC):
             'shutter_A': 'closed' if read_port & 0b100 else 'open',
             'shutter_B': 'closed' if read_port & 0b1000 else 'open',
             'busy': program_cursor != 0,
+            'program_length': program_length,
             'events_recorded': nrecords,
         }
         return status
