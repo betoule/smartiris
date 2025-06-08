@@ -1,4 +1,4 @@
-// Copyright 2024 Marc Betoule
+// Copyright 2024-2025 Marc Betoule
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@ void start_timer(uint8_t rb);
 void get_time(uint8_t rb);
 void get_clock_calibration(uint8_t rb);
 void set_clock_calibration(uint8_t rb);
+void read_adc(uint8_t rb);
 void switch_button();
 
 uint32_t duration;
@@ -88,7 +89,7 @@ uint8_t n_record = 0;
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+10;
+const uint8_t NFUNC = 2+11;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -106,6 +107,7 @@ void (*func[NFUNC])(uint8_t rb) =
    get_time,
    get_clock_calibration,
    set_clock_calibration,
+   read_adc,
   };
 
 const char* command_names[NFUNC*3] =
@@ -122,6 +124,7 @@ const char* command_names[NFUNC*3] =
    "get_time", "", "I",
    "get_clock_calibration", "", "f",
    "set_clock_calibration", "f", "",
+   "read_adc", "B", "H", 
   };
 
 
@@ -174,7 +177,17 @@ void setup(){
   TCCR2B = 0b0;
   TIMSK2 = 0b0;
   EIMSK = 0b0;
+
+  // Port C used as inputs (ADC)
+  DDRC = 0b00000000;
+  // Disable pull-ups
+  PORTC = 0;
+  
+  // Configure ADCSRA: Enable ADC, set prescaler to 128 (assuming 8–16 MHz clock)
+  ADCSRA = _BV(ADEN) | _BV(ADPS2) | _BV(ADPS1) | _BV(ADPS0);
+ 
 }
+
 
 
 
@@ -387,6 +400,27 @@ void set_clock_calibration(uint8_t rb){
   client.sndstatus(STATUS_OK);
 }
 
+void read_adc(uint8_t rb){
+  uint8_t channel = *((uint8_t *) (client.read_buffer + rb));
+  // ADCSRA reference:
+  // ADEN-ADSC-ADATE-ADIF-ADIE-ADPS2-ADPS1-ADPS0
+  
+  // Configure ADMUX: Internal 1.1V reference, right-adjusted result, select channel
+  ADMUX = _BV(REFS1) | _BV(REFS0) | (channel & 0x0F);
+
+  // Start first conversion
+  ADCSRA |= (1 << ADSC);
+
+  // Wait for conversion to complete
+  while(ADCSRA & _BV(ADSC));// ADSC is cleared when conversion finishes
+
+  // Read ADC result (read ADCL first, then ADCH)
+  uint16_t result = ADCL; // Read low byte first
+  result += (ADCH<<8); // Read high byte and combine
+  
+  client.snd((uint8_t *) &result, 2, STATUS_OK);
+}
+
 
 void switch_button(){
   //if (event == 0){
@@ -424,3 +458,4 @@ void switch_button(){
       }
   }
 }
+

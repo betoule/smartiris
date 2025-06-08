@@ -187,6 +187,20 @@ class SmartIris(bincoms.SerialBC):
             return timing/self.frequency, ['', 'sensorA', 'sensorB'][pin]
         return [convert(i) for i in range(nrecords)]
 
+    def read_temperature(self):
+        """ Read the TMP36 temperature in deg C
+        """
+        V_adc = self.read_adc(adc_pin_maps['TMP36']) * 1.1/1024
+        # 10 mV / deg and 750mV @ 25
+        temp = 25 + (V_adc - 0.75) * 100
+        return temp
+
+    def read_capacitor_bank_voltage(self):
+        """ Read the capacitor bank voltage in V
+        """
+        V_adc = self.read_adc(adc_pin_maps['U_BANK']) * 1.1/1024
+        return 46 / 10 * V_adc # Divider 10k/36k
+
     def status(self):
         """Retrieve the current status of the shutter driver.
 
@@ -239,6 +253,18 @@ port_pins = {'A': {'close': pin_map[8],
                    },
              }
 
+adc_pin_maps = {'TMP36': 0,
+                'U_BANK': 1,
+                'A2': 2,
+                'A3': 3,
+                'A4': 4,
+                'A5': 5,
+                'A6': 6,
+                'A7': 7,
+                'MCU_TEMP': 8, # internal MCU temp sensor
+                'VBG': 0b1110, # Internal voltage ref
+                'GND': 0b1111, # Ground
+                }
 
 def restricted_float(x, min_val=5., max_val=35.):
     try:

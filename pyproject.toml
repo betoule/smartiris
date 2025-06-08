@@ -12,7 +12,7 @@ authors = [
 description = ""
 readme = "README.md"
 requires-python = ">=3.7"
-dependencies = ["numpy", "pyserial", "matplotlib", "tqdm"]
+dependencies = ["numpy", "pyserial", "matplotlib", "tqdm", "ntplib"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: GPLV2",
