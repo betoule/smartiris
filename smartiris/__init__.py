@@ -43,7 +43,10 @@ class SmartIris(bincoms.SerialBC):
         """
         super().__init__(*args, **keys)
         self.frequency = self.get_frequency()
-
+        # Read mcu temperature sensor calibration constants
+        self._ts_offset = self.read_signature_row(0x0002)
+        self._ts_gain = self.read_signature_row(0x0003)
+        
     def get_frequency(self):
         ''' Return the mcu clock frequency. Nominal or calibrated if avaialable'''
         freq = self.get_clock_calibration()
@@ -187,6 +190,10 @@ class SmartIris(bincoms.SerialBC):
             return timing/self.frequency, ['', 'sensorA', 'sensorB'][pin]
         return [convert(i) for i in range(nrecords)]
 
+    def read_mcu_temperature(self):
+        V_adc = self.read_adc(adc_pin_maps['MCU_TEMP'])
+        return (V_adc - 273 + 100 - self._ts_offset)*128/self._ts_gain + 25
+    
     def read_temperature(self):
         """ Read the TMP36 temperature in deg C
         """

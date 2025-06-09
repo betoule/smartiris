@@ -30,6 +30,7 @@ void get_time(uint8_t rb);
 void get_clock_calibration(uint8_t rb);
 void set_clock_calibration(uint8_t rb);
 void read_adc(uint8_t rb);
+void read_signature_row(uint8_t rb);
 void switch_button();
 
 uint32_t duration;
@@ -89,7 +90,7 @@ uint8_t n_record = 0;
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+11;
+const uint8_t NFUNC = 2+12;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -108,6 +109,7 @@ void (*func[NFUNC])(uint8_t rb) =
    get_clock_calibration,
    set_clock_calibration,
    read_adc,
+   read_signature_row,
   };
 
 const char* command_names[NFUNC*3] =
@@ -124,7 +126,8 @@ const char* command_names[NFUNC*3] =
    "get_time", "", "I",
    "get_clock_calibration", "", "f",
    "set_clock_calibration", "f", "",
-   "read_adc", "B", "H", 
+   "read_adc", "B", "H",
+   "read_signature_row", "H", "B",
   };
 
 
@@ -457,5 +460,34 @@ void switch_button(){
 	_start_program();
       }
   }
+}
+
+void read_signature_row(uint8_t rb) {
+    uint8_t result;
+    uint16_t address;
+    client.readn(&rb, (uint8_t*) &address, 2);
+    
+    // Disable interrupts to ensure atomic operation
+    cli();
+
+    // Wait for any ongoing SPM/EEPROM operations to complete
+    while (SPMCSR & (1 << SPMEN));
+
+    // Set SIGRD and SPMEN to enable signature row read
+    SPMCSR = (1 << SIGRD) | (1 << SPMEN);
+    
+    // Load the address into Z register (R31:R30) and read using LPM
+    asm volatile("lpm %1, Z" "\n\t"    // Read byte from program memory at Z into result
+		 : "=r" (result)        // Output: result
+		 : "z" (address)   // Input: address (shifted left by 1 for word addressing)
+		 );
+
+    // Clear SPMCSR
+    SPMCSR = 0;
+
+    // Re-enable interrupts
+    sei();
+
+    client.snd(&result, 1, STATUS_OK);
 }
 
