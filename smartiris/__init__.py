@@ -57,15 +57,19 @@ class SmartIris(bincoms.SerialBC):
         else:
             return freq
 
-    def calibrate(self, duration_min=10):
+    def calibrate(self, duration_min=10, output_file=''):
         import smartiris.clock_calibration
         mcu_data, ntp_data = smartiris.clock_calibration.acquire_clock_data(self, duration=duration_min*60)
         slope, eslope = smartiris.clock_calibration.clock_calibration_fit(mcu_data['start'], mcu_data['mcu'])
         print(f'Measured a time scale difference of {(slope-1) * 100:.4f}% (±{eslope*100:.4f}%)')
-        calibrated_frequency = self.frequency * slope
-        print(f'Adjusting frequency from {self.frequency * 1e-6:.6f} MHz to {calibrated_frequency * 1e-6:.6f} MHz')
-        self.set_clock_calibration(calibrated_frequency)
-        self.frequency = calibrated_frequency
+        if output_file:
+            smartiris.clock_calibration.save(mcu_data, ntp_data, output_file)
+            print(f'Calibration data saved in {output_file}. Clock scale not adjusted')
+        else:
+            calibrated_frequency = self.frequency * slope
+            print(f'Adjusting frequency from {self.frequency * 1e-6:.6f} MHz to {calibrated_frequency * 1e-6:.6f} MHz')
+            self.set_clock_calibration(calibrated_frequency)
+            self.frequency = calibrated_frequency
         
     def _ct(self, seconds):
         """Convert a duration in seconds to a microcontroller timer count.
@@ -331,8 +335,11 @@ def test():
     parser_enable = subparsers.add_parser('enable_buttons', help='Re-enable device buttons for the session, They will have precedence over remote operations.')
     parser_calibrate = subparsers.add_parser('calibrate', help='Run time calibration procedure')
     parser_calibrate.add_argument(
-        '-d', '--duration', type=float, default=10,
+        '-d', '--duration', type=float, default=1,
         help='Duration of the calibration procedure (in minutes)')
+    parser_calibrate.add_argument(
+        '-o', '--output-file', default="",
+        help='Instead of calibrating the MCU clock register the calibration data into the provided file')
     parser_read = subparsers.add_parser('read', help='Report measured timings of sensor events')
     
     args = parser.parse_args()
@@ -356,7 +363,7 @@ def test():
     elif args.command == 'enable_buttons':
         d.enable_buttons()
     elif args.command == 'calibrate':
-        d.calibrate(args.duration)
+        d.calibrate(args.duration, args.output_file)
     elif args.command == 'read':
         record = d.read_timing_record()
         print(f'Recorded sensor events: {record}')

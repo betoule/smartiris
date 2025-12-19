@@ -1,7 +1,6 @@
 import ntplib
 import time
 import numpy as np
-import smartiris
 import matplotlib.pyplot as plt
 import tqdm
 
@@ -34,7 +33,10 @@ def acquire_clock_data(device, duration=600, ntp=0, interval=0.1):
         start = time.time()
         devtime = device.get_time()
         stop = time.time()
-        return start, devtime/device.frequency, stop
+        mcu_temp = device.read_mcu_temperature()
+        temp = device.read_temperature()
+        ubank = device.read_capacitor_bank_voltage()
+        return start, devtime/device.frequency, stop, mcu_temp, temp, ubank
 
     def ntp_tic():
         start = time.time()
@@ -61,8 +63,10 @@ def acquire_clock_data(device, duration=600, ntp=0, interval=0.1):
             pbar.n = min(progress, total_steps)
             pbar.refresh()
             time.sleep(interval)
-    return (np.rec.fromrecords(mcu_data, names=['start', 'mcu', 'stop']),
-            np.rec.fromrecords(mcu_data, names=['start', 'nntp', 'stop']))
+    if not ntp_data:
+        ntp_data = [[np.nan, np.nan, np.nan]]
+    return (np.rec.fromrecords(mcu_data, names=['start', 'mcu', 'stop', 'mcu_temp', 'temp', 'ubank']),
+            np.rec.fromrecords(ntp_data, names=['start', 'nntp', 'stop']))
 
 
 def save(mcu_data, ntp_data, filename='timing.npz'):
@@ -96,22 +100,82 @@ def clock_calibration_fit(t1, t2, show=False, axes=None, **keys):
         return p[0], eslope, axes 
     else:
         return p[0], eslope
+def binplot(x, y, binsize=10, ls='None', marker='.', ax=None, **kwargs):
+    """
+    Plot the average of y data in bins of binsize successive x values.
+    
+    Parameters:
+    x (array-like): x-coordinates of the data points
+    y (array-like): y-coordinates of the data points
+    binsize (int): Number of x values per bin (default: 10)
+    **kwargs: Additional keyword arguments passed to plt.plot
+    """
+    if ax is None:
+        ax = plt.gca()
+    # Convert inputs to numpy arrays
+    x = np.array(x)
+    y = np.array(y)
+    
+    # Sort data by x values
+    sort_idx = np.argsort(x)
+    x_sorted = x[sort_idx]
+    y_sorted = y[sort_idx]
+    
+    # Calculate number of bins
+    n = len(x)
+    nbins = n // binsize + (1 if n % binsize else 0)
 
+    bins = np.repeat(np.arange(nbins), binsize)[:n]
+    N = np.bincount(bins)
+    x_means = np.bincount(bins, x)/N
+    y_means = np.bincount(bins, y)/N
+    y_rms = np.sqrt(np.bincount(bins, y**2) / N - y_means**2)
+    # Create the plot
+    ax.errorbar(x_means, y_means, y_rms/np.sqrt(N), ls=ls, marker=marker, **kwargs)
+    return x_means, y_means, y_rms/np.sqrt(N)
+    #plt.grid(True)
+    
 if __name__ == '__main__':
-
+    import smartiris
+    import sys
     plt.rc('axes.spines', right=False, top=False)
     plt.rc('text', usetex=True)
 
-    mcu_data, ntp_data = load('timing3.npz')
-    
-    d1 = mcu_data[:mcu_data['mcu'].argmax()+1]
-    d2 = mcu_data[mcu_data['mcu'].argmax()+1:]
-    slope1, eslope1, axes = clock_calibration_fit(d1['start'], d1['mcu'], show=True, color='#1b9e77')
-    slope2, eslope2, axes = clock_calibration_fit(d2['start'], d2['mcu'], show=True, axes=axes, color='#d95f02')
+    mcu_data, ntp_data = load(sys.argv[1])
+    plt.figure('calibration fit')
+    slope1, eslope1, axes = clock_calibration_fit(mcu_data['start'], mcu_data['mcu'], show=True, color='#1b9e77')
+    #d1 = mcu_data[:mcu_data['mcu'].argmax()+1]
+    #d2 = mcu_data[mcu_data['mcu'].argmax()+1:]
+    #slope1, eslope1, axes = clock_calibration_fit(d1['start'], d1['mcu'], show=True, color='#1b9e77')
+    #slope2, eslope2, axes = clock_calibration_fit(d2['start'], d2['mcu'], show=True, axes=axes, color='#d95f02')
 
     calibrated_frequency = 2e6 * slope1
     plt.tight_layout()
-    plt.savefig('doc/clock_calibration.png', dpi=300)
+    binsize = 300
+    t = []
+    slope = []
+    eslope = []
+    for i in range(len(mcu_data)//binsize):
+        cutout = slice(i*binsize,(i+1)*binsize)
+        s, e = clock_calibration_fit(mcu_data['start'][cutout], mcu_data['mcu'][cutout])
+        t.append((mcu_data['start'][cutout] - mcu_data['start'][0]).mean())
+        slope.append(s)
+        eslope.append(e)
+    f = plt.figure('temp evolution')
+    if not f.axes:
+        ax1, ax2 = f.subplots(2,1,sharex=True)
+    else:
+        ax1, ax2 = f.axes
+    t0, temp, etemp = binplot(mcu_data['start'] - mcu_data['start'].min(), mcu_data['temp'], binsize, ax=ax1)
+    plt.xlabel('mcu clock [s]')
+    plt.ylabel('temperature [°C]')
+    
+    ax2.errorbar(t, slope, eslope)
+    plt.tight_layout()
+
+    plt.figure('temp')
+    plt.errorbar(temp[:-1], slope, xerr=etemp[:-1], yerr=eslope, ls='None', marker='.')
+    #plt.savefig('doc/clock_calibration.png', dpi=300)
     
 #axes = calib(mcu_data['start'] - mcu_data['start'].min(), mcu_data['mcu'] - mcu_data['mcu'].min())
 #calib(ntp_data['start'] - ntp_data['start'].min(), ntp_data['ntp'] - ntp_data['ntp'].min(), axes)

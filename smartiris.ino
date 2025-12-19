@@ -59,10 +59,10 @@ uint8_t active_nevent;
 Event program[MAX_N_EVENTS];
 
 // Those are 4 builtin programs to open and close the two shutters when the button are activated
-Event OpenA[2] = {{20000, 0x0, 0b10}, {14464, 1, 0b10}};
-Event CloseA[2] = {{20000, 0x0, 0b1}, {14464, 1, 0b1}};
-Event OpenB[2] = {{20000, 0x0, 0b1000}, {14464, 1, 0b1000}};
-Event CloseB[2] = {{20000, 0x0, 0b100}, {14464, 1, 0b100}};
+Event OpenA[2] = {{20000, 0x0, 0b10}, {0x5f90, 1, 0b10}};
+Event CloseA[2] = {{20000, 0x0, 0b1}, {0x5f90, 1, 0b1}};
+Event OpenB[2] = {{20000, 0x0, 0b1000}, {0x5f90, 1, 0b1000}};
+Event CloseB[2] = {{20000, 0x0, 0b100}, {0x5f90, 1, 0b100}};
 
 // To record sensor event timings
 Event sensor_timing_record[MAX_N_RECORDS];
@@ -73,6 +73,7 @@ uint8_t n_record = 0;
 // interrupt and record incorrect timing because of that.
 #define INTERRUPT_HANDLER(line)                                    \
   sensor_timing_record[n_record].time_LB = TCNT1;                   \
+  PINB |= _BV(PB5);                                                  \ 
   if ((TIFR1 & 0b1) && (sensor_timing_record[n_record].time_LB < 10)){\
     timeHB++;							   \
     TIFR1 |= _BV(TOV1);						   \
