@@ -19,6 +19,8 @@ Features
 * Internal clock calibration for accurate timings
 * Half-microsecond resolution on timings
 * Timing of the iris movements via sensor feedback
+* Echo the sensor feedback signal on a trig-out line
+* Possibility to echo the pulse commands on the trig-out line
 
 Getting Started
 ---------------
@@ -158,6 +160,8 @@ smartiris [OPTIONS] COMMAND
   `smartiris -p B -w 25 open`
 - Keep the shutter open for 3 seconds:  
   `smartiris timed -e 3.0`
+- Same thing, this time echoing the pulse signals (relevant when the feedback sensor is cooked):  
+  `smartiris timed -e 3.0 --echo`
 - Check the shutter status with verbose output of the communication with the device:  
   `smartiris -v status`
 - Interrupt a long duration exposure. The shutter will remain in its current state.
@@ -194,7 +198,7 @@ print('Close port A shutter')
 d.close_shutter()
 print('Wait for completion')
 d.wait()
-
+,
 print('Open for 3 seconds after a 2 seconds delay (setup only)')
 d.timed_shutter(delay_sec=2, duration_sec=3)
 print('Wait for completion')
@@ -204,8 +208,12 @@ print('re-trigger')
 d.start_program()
 print('Wait for completion')
 d.wait()
-```
 
+# If the feedback sensor is not working, one can echo the control pulses on the trigger line instead
+d.timed_shutter(delay_sec=2, duration_sec=3, echo=True)
+d.wait()
+```
+	
 Roadmap
 -------
 
@@ -215,6 +223,8 @@ Roadmap
 
 Release History
 ---------------
+### v0.3.1
+- When the shutter position sensor is cooked, it can be convenient to echo the pulse signals on the trigout
 ### v0.3.0
 - Implement a calibration procedure for the MCU clock enabling accurate timings
 

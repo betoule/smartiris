@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smartiris"
-version = "1.0.0"
+version = "0.3.1"
 authors = [
   { name="Marc Betoule", email="marc.betoule@lpnhe.in2p3.fr" },
   { name="Fabien Frerot", email="frerot@lpnhe.in2p3.fr" },
