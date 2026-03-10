@@ -259,7 +259,7 @@ void program_pulse(uint8_t rb){
   /* Program one slot of the pulse program
    *
    * The function reads 3 arguments from the communication buffer:
-   * pin: the pin to switch between 0 and 5 (Byte)
+   * pin: the portB mask to select which pin to switch (Byte)
    * n_events: (Byte) the slot number in the program between 0 and MAX_N_EVENTS - 1
    * duration: (int) the timing of the switch in counts since the launch of the program. A count as a value of 0.5e-6 seconds.
    */
@@ -275,7 +275,7 @@ void program_pulse(uint8_t rb){
     client.snd((uint8_t*) &duration, 4, VALUE_ERROR);
     return;
   }
-  if (pin > 5){
+  if (pin & 11000000){
     client.snd((uint8_t*) &duration, 4, VALUE_ERROR);
     return;
   } 
@@ -283,8 +283,10 @@ void program_pulse(uint8_t rb){
     client.snd((uint8_t*) &duration, 4);
 
   // set up the pin sequence
-  // Converting the pin number to bit positon
-  program[n_events].pin = 1 << pin;
+  // We receive directly the pin mask
+  program[n_events].pin = pin;
+  //Convert pin number to bit position
+  //program[n_events].pin = 1 << pin;
 
   // set up the timings
   program[n_events].time_LB = duration & 0xFFFF;

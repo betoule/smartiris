@@ -122,7 +122,7 @@ class SmartIris(bincoms.SerialBC):
                 self.flush()
         raise IOError(f'Corrupted program on device. Asked for ({timing_count}, {1<<pin}) got ({rtiming}, {rpin}) in position {pos}')
                 
-    def timed_shutter(self, delay_sec=1e-4, duration_sec=1, port='A', pulsewidth_sec=30e-3, exec=True):
+    def timed_shutter(self, delay_sec=1e-4, duration_sec=1, port='A', pulsewidth_sec=30e-3, exec=True, echo=False):
         """Program a sequence to open and close the shutter with specified timing.
 
         This method sets up a sequence of pulses to open the shutter after a delay,
@@ -134,8 +134,9 @@ class SmartIris(bincoms.SerialBC):
             port (str): Shutter port identifier (default: 'A').
             pulsewidth_sec (float): Duration of the opening/closing pulses (default: 0.03 s).
             exec (bool): If false program only. The execution can be triggered later using method start_program.
+            echo (bool): If True, the pulses are echoed on the trigger out line.
         """
-        pins = port_pins[port]
+        pins = port_pins_with_echo[port] if echo else port_pins[port]
         self.safe_program_pulse(pins['open'], 0, delay_sec)
         self.safe_program_pulse(pins['open'], 1, delay_sec + pulsewidth_sec)
         self.safe_program_pulse(pins['close'], 2, delay_sec + duration_sec)
@@ -143,7 +144,7 @@ class SmartIris(bincoms.SerialBC):
         if exec:
             self.start_program()
 
-    def open_shutter(self, port='A', pulsewidth_sec=30e-3, delay_sec=10e-3, exec=True):
+    def open_shutter(self, port='A', pulsewidth_sec=30e-3, delay_sec=10e-3, exec=True, echo=False):
         """Open the shutter on the specified port.
 
         Programs and starts a sequence to activate the open pin for the given pulse width.
@@ -153,14 +154,15 @@ class SmartIris(bincoms.SerialBC):
             pulsewidth_sec (float): Duration of the opening pulse (default: 0.03 s).
             delay_sec (float): Delay before starting (default: 0.01 s).
             exec (bool): If false program only. The execution can be triggered later using method start_program.
+            echo (bool): If True, the pulses are echoed on the trigger out line.
         """
-        pins = port_pins[port]
+        pins = port_pins_with_echo[port] if echo else port_pins[port]
         self.program_pulse(pins['open'], 0, self._ct(delay_sec))
         self.program_pulse(pins['open'], 1, self._ct(delay_sec + pulsewidth_sec))
         if exec:
             self.start_program()
 
-    def close_shutter(self, port='A', pulsewidth_sec=30e-3, delay_sec=10e-3):
+    def close_shutter(self, port='A', pulsewidth_sec=30e-3, delay_sec=10e-3, exec=True, echo=False):
         """Close the shutter on the specified port.
 
         Programs and starts a sequence to activate the close pin for the given pulse width.
@@ -170,8 +172,9 @@ class SmartIris(bincoms.SerialBC):
             pulsewidth_sec (float): Duration of the closing pulse (default: 0.03 s).
             delay_sec (float): Delay before starting (default: 0.01 s).
             exec (bool): If false program only. The execution can be triggered later using method start_program.
+            echo (bool): If True, the pulses are echoed on the trigger out line.
         """
-        pins = port_pins[port]
+        pins = port_pins_with_echo[port] if echo else port_pins[port]
         self.program_pulse(pins['close'], 0, self._ct(delay_sec))
         self.program_pulse(pins['close'], 1, self._ct(delay_sec + pulsewidth_sec))
         if exec:
@@ -248,13 +251,14 @@ class SmartIris(bincoms.SerialBC):
 
     def disable_buttons(self):
         self._set_interrupt_mask(0)
-            
-pin_map = {8: 0,
-           9: 1,
-           10: 2,
-           11: 3,
-           12: 4,
-           13: 5,
+
+# This is the portB mask corresponding to each pins
+pin_map = {8: 1 << 0,
+           9: 1 << 1,
+           10: 1 << 2,
+           11: 1 << 3,
+           12: 1 << 4,
+           13: 1 << 5, # Trig_out
            }
 
 port_pins = {'A': {'close': pin_map[8],
@@ -263,6 +267,9 @@ port_pins = {'A': {'close': pin_map[8],
                    'open': pin_map[11],
                    },
              }
+
+# If we want to echo the changes on the trig_out line 
+port_pins_with_echo = {k: {s: (p | pin_map[13]) for s, p in d.items()} for k, d in port_pins.items()}
 
 adc_pin_maps = {'TMP36': 0,
                 'U_BANK': 1,
