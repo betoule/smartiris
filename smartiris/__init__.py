@@ -115,7 +115,7 @@ class SmartIris(bincoms.SerialBC):
             try:
                 self.program_pulse(pin, pos, timing_count)
                 rtiming, rpin = self.get_program(pos, 0)
-                if (rtiming == timing_count) and (rpin == 1<<pin):
+                if (rtiming == timing_count) and (rpin == pin):
                     return
             except ValueError:
                 print('Catched communication error')
@@ -298,7 +298,7 @@ def test():
     parser = argparse.ArgumentParser(
         description='Operate an iris blade shutter')
     parser.add_argument(
-        '-t', '--tty', default='',
+        '-t', '--tty', default='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_BG003I0G-if00-port0',
         help='link to a specific tty port')
     parser.add_argument(
         '-w', '--pulse-width', default=30e-3,
@@ -319,15 +319,24 @@ def test():
 
     # Parser for the 'open' command
     parser_open = subparsers.add_parser('open', help='Open the shutter')
+    parser_open.add_argument(
+        '-o', '--echo', action='store_true',
+        help='Activate echoing on the trigout line')
 
     # Parser for the 'close' command
     parser_close = subparsers.add_parser('close', help='Close the shutter')
+    parser_close.add_argument(
+        '-o', '--echo', action='store_true',
+        help='Activate echoing on the trigout line')
 
     # Parser for the 'timed' command
     parser_timed = subparsers.add_parser('timed', help='Open shutter for a specific duration')
     parser_timed.add_argument(
         '-d', '--delay', type=float, default=10e-3,
         help='Duration to keep the shutter open (in seconds)')
+    parser_timed.add_argument(
+        '-o', '--echo', action='store_true',
+        help='Activate echoing on the trigout line')
 
     parser_timed.add_argument(
         '-e', '--exposure-time', type=float, default=1.,
@@ -353,11 +362,11 @@ def test():
         
     d = SmartIris(dev=args.tty, baudrate=115200, debug=args.verbose, reset=args.reset)
     if args.command == 'open':
-        d.open_shutter(port=args.port, pulsewidth_sec=args.pulse_width)
+        d.open_shutter(port=args.port, pulsewidth_sec=args.pulse_width, echo=args.echo)
     elif args.command == 'close':
-        d.close_shutter(port=args.port, pulsewidth_sec=args.pulse_width)
+        d.close_shutter(port=args.port, pulsewidth_sec=args.pulse_width, echo=args.echo)
     elif args.command == 'timed':
-        d.timed_shutter(port=args.port, pulsewidth_sec=args.pulse_width, duration_sec=args.exposure_time, delay_sec=args.delay)
+        d.timed_shutter(port=args.port, pulsewidth_sec=args.pulse_width, duration_sec=args.exposure_time, delay_sec=args.delay, echo=args.echo)
     elif args.command == 'status':
         if args.raw:
             print(d.raw_status())
