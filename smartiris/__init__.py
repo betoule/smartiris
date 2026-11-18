@@ -96,6 +96,17 @@ class SmartIris(bincoms.SerialBC):
             tmp36_present = 465 <= self.test_pullup(
                 adc_pin_maps['TMP36']) <= 1015
         bank_present = readings['U_BANK'] >= 700
+        # A floating net still settling after a disturbance (observed
+        # right after plugging a board) can pass a one-shot test at an
+        # intermediate value, while a wired low impedance source is
+        # stable. Re-check the channels that looked present at the end
+        # of the sequence, a few milliseconds later.
+        if bank_present:
+            bank_present = abs(self.read_adc(adc_pin_maps['U_BANK'])
+                               - readings['U_BANK']) <= 80
+        if tmp36_present:
+            tmp36_present = abs(self.read_adc(adc_pin_maps['TMP36'])
+                                - readings['TMP36']) <= 80
         return {'TMP36': tmp36_present, 'U_BANK': bank_present}
 
     @property
