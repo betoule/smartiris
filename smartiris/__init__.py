@@ -34,9 +34,9 @@ class SmartIris(bincoms.SerialBC):
 
         Args:
             *args: Variable length argument list passed to the parent class.
-            board_version: Declare the hardware revision (1 or 2) instead
-                of letting it be autodetected from the wired options on
-                first use. See the board_version property.
+            board_version: Declare the hardware revision (1 or 2), for
+                devices whose firmware cannot report it. See the
+                board_version property.
             **keys: Keyword arguments passed to the parent class.
         """
         super().__init__(*args, **keys)
@@ -50,74 +50,22 @@ class SmartIris(bincoms.SerialBC):
         self._v2_features = None
         self._firmware_info = None
 
-    def _probe_v2_features(self):
-        """Discover which of the v2-only ADC channels are actually wired.
-
-        v2 boards drive ADC0 with the external TMP36 temperature probe
-        and ADC1 with a voltage divider monitoring the capacitor bank.
-        Detection is bounded by what those sources can physically
-        output, and by the observed behaviour of unwired v1 inputs:
-        their whole ADC header is pulled towards VCC (every channel
-        saturates at 1023) or, unpulled, hovers near 0 — it never
-        shows stable intermediate readings.
-
-        - TMP36 outputs 0.5 to 1.1 V between -20 and +60 degC (465 to
-          1023 counts on the internal 1.1 V reference). A reading
-          pinned at the rail is not a (plausibly cold) TMP36. When the
-          firmware has test_pullup, the source must also stay inside
-          the plausible window while the ~30 kOhm internal pull-up is
-          enabled: a low impedance TMP36 output shifts by only ~150
-          counts while a high impedance leak is dragged to the rail.
-        - The bank divider reads above ~4.2 V as soon as the built-in
-          bank is charged, and cannot be at the rail like the v1
-          header: all channels saturating together means unwired.
-        """
-        if not hasattr(self, 'read_adc'):
-            # The ADC commands appeared along with the v2 boards: a
-            # firmware without them predates them.
-            return {'TMP36': False, 'U_BANK': False}
-
-        def median(name, n=3):
-            vals = sorted(self.read_adc(adc_pin_maps[name])
-                          for _ in range(n))
-            return vals[n // 2]
-
-        readings = {'TMP36': median('TMP36'),
-                    'U_BANK': median('U_BANK'),
-                    'A2': median('A2', 1),
-                    'A5': median('A5', 1)}
-        unwired = (all(v >= 1010 for v in readings.values())
-                   or all(v <= 15 for v in readings.values()))
-        if unwired:
-            return {'TMP36': False, 'U_BANK': False}
-
-        tmp36_present = 465 <= readings['TMP36'] <= 1005
-        if tmp36_present and hasattr(self, 'test_pullup'):
-            tmp36_present = 465 <= self.test_pullup(
-                adc_pin_maps['TMP36']) <= 1015
-        bank_present = readings['U_BANK'] >= 700
-        # A floating net still settling after a disturbance (observed
-        # right after plugging a board) can pass a one-shot test at an
-        # intermediate value, while a wired low impedance source is
-        # stable. Re-check the channels that looked present at the end
-        # of the sequence, a few milliseconds later.
-        if bank_present:
-            bank_present = abs(self.read_adc(adc_pin_maps['U_BANK'])
-                               - readings['U_BANK']) <= 80
-        if tmp36_present:
-            tmp36_present = abs(self.read_adc(adc_pin_maps['TMP36'])
-                                - readings['TMP36']) <= 80
-        return {'TMP36': tmp36_present, 'U_BANK': bank_present}
-
     @property
     def _v2_present(self):
         if self._v2_features is None:
-            if self._board_version is not None:
-                driven = self._board_version >= 2
+            version = self.board_version
+            if version is None:
+                # Interim era firmware (has the ADC commands but does
+                # not report its target): it cannot tell which board
+                # it runs on, and unwired ADC pins can sit at any
+                # level, so nothing is guessed electrically. Keep the
+                # v2 features available, as every host that shipped
+                # with that firmware did.
                 self._v2_features = dict.fromkeys(('TMP36', 'U_BANK'),
-                                                  driven)
+                                                  True)
             else:
-                self._v2_features = self._probe_v2_features()
+                self._v2_features = dict.fromkeys(
+                    ('TMP36', 'U_BANK'), version >= 2)
         return self._v2_features
 
     @property
@@ -146,39 +94,33 @@ class SmartIris(bincoms.SerialBC):
 
     @property
     def board_version(self):
-        """Hardware revision of the connected board: 1 or 2.
+        """Hardware revision of the connected board: 1, 2, or None if
+        the device cannot tell.
 
-        Taken from the revision the device firmware was compiled for
-        ('make flashv1' builds for v1 boards), board_version_source
-        then reading 'firmware'. Firmware too old to report it gets
-        detected from the presence of the v2-only options instead
-        (see _probe_v2_features), source 'detected'. A disagreement
-        between the compiled target and the wired options is warned
-        about. 'declared' when given explicitly to the
-        constructor."""
-        if self._board_version is None:
+        The revision is the one the device firmware was compiled for
+        ('make flashv1' builds for the v1 boards), reported over the
+        serial protocol; board_version_source then reads 'firmware'.
+        Firmware older than the v2 hardware lacks the ADC commands
+        altogether, which reliably places it on a v1 board (source
+        'pre-v2 firmware'). Firmware of the interim era (ADC commands
+        but no identity reporting) leaves the revision unknown (None,
+        source 'unknown'): update the firmware, or declare the board
+        with SmartIris(board_version=...). Nothing is ever guessed
+        from the analog levels of possibly unwired ADC pins, which
+        can sit at any level.
+        """
+        if self._board_version is None and self.board_version_source is None:
             target = self.firmware_board_target
             if target in (1, 2):
-                # The compiled-in target is the authoritative identity;
-                # the wiring measurement gates the features and serves
-                # as a sanity check only.
                 self._board_version = target
                 self.board_version_source = 'firmware'
-                self._v2_features = self._probe_v2_features()
-                detected = 2 if any(self._v2_features.values()) else 1
-                if detected != target:
-                    import warnings
-                    warnings.warn(
-                        f'The device firmware is built for a v{target} '
-                        f'board while the wired options look like a '
-                        f'v{detected} board. Check the wiring, or flash '
-                        f'the matching build ("make '
-                        f'{"flashv1" if detected == 1 else "flash"}").')
+            elif not hasattr(self, 'read_adc'):
+                # The ADC commands appeared along with the v2 boards:
+                # a firmware without them predates them.
+                self._board_version = 1
+                self.board_version_source = 'pre-v2 firmware'
             else:
-                # Firmware too old to report its identity.
-                self._board_version = (2 if any(
-                    self._v2_present.values()) else 1)
-                self.board_version_source = 'detected'
+                self.board_version_source = 'unknown'
         return self._board_version
 
     @property

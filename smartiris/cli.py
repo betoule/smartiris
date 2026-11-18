@@ -100,10 +100,10 @@ def main(
     board: Annotated[
         int, typer.Option(
             '--board-version', min=0, max=2,
-            help='Declare the hardware revision of the device (1 or 2). '
-            'By default it is autodetected from the wired options (the '
-            'v2 boards have the external temperature probe and the '
-            'capacitor bank monitor that the v1 boards lack).')] = 0,
+            help='Declare the hardware revision of the device (1 or 2), '
+            'for devices whose firmware cannot report it. Firmware '
+            'built with "make flash" (v2) or "make flashv1" (v1) '
+            'reports the revision it targets.')] = 0,
 ):
     """Operate an iris blade shutter"""
     ctx.obj = {'tty': tty, 'pulse_width': pulse_width * 1e-3,
@@ -186,7 +186,8 @@ def devices():
     for dev in found:
         try:
             d = SmartIris(dev=dev, baudrate=115200)
-            board = f'v{d.board_version} ({d.board_version_source})'
+            bv = d.board_version
+            board = f'v{bv} ({d.board_version_source})' if bv else 'unknown'
             fw = d.firmware_version
             firmware = '.'.join(map(str, fw)) if fw else 'unknown'
             d.com.close()
@@ -227,7 +228,10 @@ def status(ctx: typer.Context,
     table = Table(box=None, show_header=False, pad_edge=False)
     table.add_column('property', style='bold')
     table.add_column('value')
-    table.add_row('Board', f'v{d.board_version} ({d.board_version_source})')
+    bv = d.board_version
+    table.add_row('Board', f'v{bv} ({d.board_version_source})' if bv
+                  else f'unknown ({d.board_version_source}: update the '
+                       'firmware or pass --board-version)')
     fw = d.firmware_version
     table.add_row('Firmware', '.'.join(map(str, fw)) if fw
                   else 'unknown (predates version reporting)')
