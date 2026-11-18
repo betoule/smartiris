@@ -33,6 +33,8 @@ void get_clock_calibration(uint8_t rb);
 void set_clock_calibration(uint8_t rb);
 void read_adc(uint8_t rb);
 void test_pullup(uint8_t rb);
+void get_board_version(uint8_t rb);
+void set_board_version(uint8_t rb);
 void read_signature_row(uint8_t rb);
 void switch_button();
 
@@ -94,7 +96,7 @@ uint8_t n_record = 0;
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+13;
+const uint8_t NFUNC = 2+15;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -115,6 +117,8 @@ void (*func[NFUNC])(uint8_t rb) =
    read_adc,
    read_signature_row,
    test_pullup,
+   get_board_version,
+   set_board_version,
   };
 
 const char* command_names[NFUNC*3] =
@@ -134,6 +138,8 @@ const char* command_names[NFUNC*3] =
    "read_adc", "B", "H",
    "read_signature_row", "H", "B",
    "test_pullup", "B", "H",
+   "get_board_version", "", "B",
+   "set_board_version", "B", "",
   };
 
 
@@ -463,6 +469,38 @@ void test_pullup(uint8_t rb){
   result = ADCW;
   PORTC &= ~_BV(PC0 + channel);
   client.snd((uint8_t *) &result, 2, STATUS_OK);
+}
+
+// The hardware revision is stored in EEPROM (a magic byte next to the
+// value) once provisioned with "smartiris set_board_version", so that
+// hosts no longer need to guess it. Address 0..3 hold the clock
+// calibration float.
+#define BOARD_ID_MAGIC 0x5A
+#define BOARD_ID_ADDR  4
+
+void get_board_version(uint8_t rb){
+  uint8_t version = 0xFF; // Not provisioned
+  if (eeprom_read_byte((uint8_t*)BOARD_ID_ADDR) == BOARD_ID_MAGIC)
+    version = eeprom_read_byte((uint8_t*)(BOARD_ID_ADDR+1));
+  client.snd(&version, 1, STATUS_OK);
+}
+
+void set_board_version(uint8_t rb){
+  uint8_t version = *((uint8_t *) (client.read_buffer + rb));
+  if (version != 1 && version != 2){
+    client.sndstatus(STATUS_ERROR);
+    return;
+  }
+  // Skip the write when already provisioned with this value (EEPROM
+  // has a limited number of write cycles).
+  if (!(eeprom_read_byte((uint8_t*)BOARD_ID_ADDR) == BOARD_ID_MAGIC &&
+        eeprom_read_byte((uint8_t*)(BOARD_ID_ADDR+1)) == version)){
+    // Write the value before the magic byte so a half written
+    // provision is never read as valid.
+    eeprom_write_byte((uint8_t*)(BOARD_ID_ADDR+1), version);
+    eeprom_write_byte((uint8_t*)BOARD_ID_ADDR, BOARD_ID_MAGIC);
+  }
+  client.sndstatus(STATUS_OK);
 }
 
 

@@ -45,6 +45,8 @@ class SmartIris(bincoms.SerialBC):
         self._ts_offset = self.read_signature_row(0x0002)
         self._ts_gain = self.read_signature_row(0x0003)
         self._board_version = board_version
+        self.board_version_source = ('declared' if board_version
+                                     is not None else None)
         self._v2_features = None
 
     def _probe_v2_features(self):
@@ -52,50 +54,108 @@ class SmartIris(bincoms.SerialBC):
 
         v2 boards drive ADC0 with the external TMP36 temperature probe
         and ADC1 with a voltage divider monitoring the capacitor bank.
-        Both inputs are unwired on v1 boards, where floating nets hover
-        near 0 whatever is done to them (including enabling the
-        internal pull-up, see the test_pullup firmware command). Hence
-        a channel is considered wired when the median of a few samples
-        sits at a voltage its source could not go below: 0.43 V for the
-        TMP36 (it outputs 0.5 V at -20 degC), and 0.75 V (~4.2 V on
-        the bank) for the divider, the bank being charged as soon as
-        the controller is powered."""
+        Detection is bounded by what those sources can physically
+        output, and by the observed behaviour of unwired v1 inputs:
+        their whole ADC header is pulled towards VCC (every channel
+        saturates at 1023) or, unpulled, hovers near 0 — it never
+        shows stable intermediate readings.
+
+        - TMP36 outputs 0.5 to 1.1 V between -20 and +60 degC (465 to
+          1023 counts on the internal 1.1 V reference). A reading
+          pinned at the rail is not a (plausibly cold) TMP36. When the
+          firmware has test_pullup, the source must also stay inside
+          the plausible window while the ~30 kOhm internal pull-up is
+          enabled: a low impedance TMP36 output shifts by only ~150
+          counts while a high impedance leak is dragged to the rail.
+        - The bank divider reads above ~4.2 V as soon as the built-in
+          bank is charged, and cannot be at the rail like the v1
+          header: all channels saturating together means unwired.
+        """
         if not hasattr(self, 'read_adc'):
             # The ADC commands appeared along with the v2 boards: a
             # firmware without them predates them.
             return {'TMP36': False, 'U_BANK': False}
 
-        def wired(name, floor):
-            readings = sorted(self.read_adc(adc_pin_maps[name])
-                              for _ in range(3))
-            return readings[1] > floor
+        def median(name, n=3):
+            vals = sorted(self.read_adc(adc_pin_maps[name])
+                          for _ in range(n))
+            return vals[n // 2]
 
-        return {'TMP36': wired('TMP36', 400),
-                'U_BANK': wired('U_BANK', 700)}
+        readings = {'TMP36': median('TMP36'),
+                    'U_BANK': median('U_BANK'),
+                    'A2': median('A2', 1),
+                    'A5': median('A5', 1)}
+        unwired = (all(v >= 1010 for v in readings.values())
+                   or all(v <= 15 for v in readings.values()))
+        if unwired:
+            return {'TMP36': False, 'U_BANK': False}
+
+        tmp36_present = 465 <= readings['TMP36'] <= 1005
+        if tmp36_present and hasattr(self, 'test_pullup'):
+            tmp36_present = 465 <= self.test_pullup(
+                adc_pin_maps['TMP36']) <= 1015
+        bank_present = readings['U_BANK'] >= 700
+        return {'TMP36': tmp36_present, 'U_BANK': bank_present}
+
+    def _stored_board_version(self):
+        """The revision provisioned in the device EEPROM, or None."""
+        if hasattr(self, 'get_board_version'):
+            version = self.get_board_version()
+            if version in (1, 2):
+                return version
+        return None
 
     @property
     def _v2_present(self):
         if self._v2_features is None:
-            if self._board_version is not None:
-                driven = self._board_version >= 2
-                self._v2_features = dict.fromkeys(('TMP36', 'U_BANK'),
-                                                  driven)
-            else:
-                self._v2_features = self._probe_v2_features()
+            if self._board_version is None:
+                stored = self._stored_board_version()
+                if stored is not None:
+                    self._board_version = stored
+                    self.board_version_source = 'eeprom'
+            if self._v2_features is None:
+                if self._board_version is not None:
+                    driven = self._board_version >= 2
+                    self._v2_features = dict.fromkeys(
+                        ('TMP36', 'U_BANK'), driven)
+                else:
+                    self._v2_features = self._probe_v2_features()
         return self._v2_features
 
     @property
     def board_version(self):
         """Hardware revision of the connected board: 1 or 2.
 
-        Detected from the presence of the v2-only options (external
-        temperature probe and capacitor bank monitor, see
-        _probe_v2_features) unless declared explicitly with
-        SmartIris(board_version=...)."""
+        Taken from the revision provisioned in the device EEPROM (see
+        provision_board_version) when present, otherwise detected from
+        the presence of the v2-only options (external temperature
+        probe and capacitor bank monitor, see _probe_v2_features).
+        board_version_source tells which: 'eeprom', 'detected' or
+        'declared' (when given explicitly to the constructor)."""
         if self._board_version is None:
-            self._board_version = (2 if any(self._v2_present.values())
+            self._v2_present  # may pick up an EEPROM provision
+        if self._board_version is None:
+            self._board_version = (2 if any(self._v2_features.values())
                                    else 1)
+            self.board_version_source = 'detected'
         return self._board_version
+
+    def provision_board_version(self, version):
+        """Store the hardware revision (1 or 2) in the device EEPROM.
+
+        The value then takes precedence over autodetection at every
+        later connection. It lives in EEPROM, so it survives firmware
+        updates. Requires current firmware on the device."""
+        if version not in (1, 2):
+            raise ValueError('Board version must be 1 or 2')
+        if not hasattr(self, 'set_board_version'):
+            raise NotImplementedError(
+                'The device firmware cannot store a board version. '
+                'Update the firmware (make flash) and retry.')
+        self.set_board_version(version)
+        self._board_version = version
+        self.board_version_source = 'eeprom'
+        self._v2_features = None  # recompute from the new version
 
     @property
     def has_temperature_probe(self):

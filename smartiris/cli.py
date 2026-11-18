@@ -204,7 +204,7 @@ def status(ctx: typer.Context,
     table = Table(box=None, show_header=False, pad_edge=False)
     table.add_column('property', style='bold')
     table.add_column('value')
-    table.add_row('Board', f'v{d.board_version}')
+    table.add_row('Board', f'v{d.board_version} ({d.board_version_source})')
     table.add_row('Shutter A', shutter(st['shutter_A']))
     table.add_row('Shutter B', shutter(st['shutter_B']))
     table.add_row('Program', program)
@@ -227,6 +227,20 @@ def enable_buttons(ctx: typer.Context):
     over remote operations."""
     d = get_device(ctx)
     d.enable_buttons()
+
+
+@app.command('set_board_version')
+def set_board_version(ctx: typer.Context,
+                      version: Annotated[
+                          int, typer.Argument(
+                              min=1, max=2,
+                              help='Hardware revision of the device')] = 2):
+    """Store the hardware revision in the device EEPROM. The value then
+    takes precedence over autodetection (it survives firmware updates).
+    Requires current firmware on the device."""
+    d = get_device(ctx)
+    d.provision_board_version(version)
+    print(f'Board version v{version} stored in the device EEPROM.')
 
 
 @app.command()
