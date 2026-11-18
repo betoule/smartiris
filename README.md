@@ -126,6 +126,19 @@ The `smartiris` command-line tool controls supports several commands and options
 smartiris [OPTIONS] COMMAND
 ```
 
+#### Shell completion
+
+The command line is based on `typer` and supports shell completion
+(including completion of the `--tty` serial device). Activate it once
+with:
+
+```bash
+eval "$(smartiris --install-completion)"
+```
+
+or add its output (`smartiris --show-completion`) to your shell init
+file.
+
 #### Options
 - `-t, --tty PORT`  
   Specify the TTY port (default: `""` attempt to autodetect the relevant serial device).
