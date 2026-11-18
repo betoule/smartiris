@@ -117,36 +117,33 @@ ls /dev/tty*.*
 
 ### Hardware revisions (v1 and v2)
 
-The same firmware and host software run on both hardware revisions.
-The v2 boards add two options that the v1 boards lack: an external
-TMP36 temperature probe (ADC0) and a voltage divider monitoring the
-capacitor bank (ADC1). Both inputs are unwired on v1 boards.
+Both hardware revisions run the same firmware code; build it for the
+revision at hand:
 
-`smartiris status` shows the board revision, and the
-`has_temperature_probe` and `has_capacitor_bank_monitor` properties
-tell which options are wired. `read_temperature()` and
+- `make flash` builds and flashes firmware for the **v2** boards,
+- `make flashv1` flashes the build for the legacy **v1** boards.
+
+The v2 boards add two options the v1 boards lack: an external TMP36
+temperature probe (ADC0) and a voltage divider monitoring the
+capacitor bank (ADC1), both unwired on v1. The firmware reports its
+version (kept in sync with the python package release) and the board
+revision it was built for, which `smartiris status` displays, and the
+host cross-checks that identity against the wired options: flashing a
+build for the wrong revision raises a warning naming the matching
+build, and the hardware measurement always wins. On boards running a
+firmware too old to report its identity, the measurement decides on
+its own: the unwired v1 ADC header is pulled towards VCC (every
+channel saturates) or hovers near 0, while the v2 sources sit at
+plausible stable voltages (the TMP36 between -20 and +60 degC, the
+bank divider above 4.2 V whenever the controller is powered), the
+`test_pullup` firmware command confirming the probe is a low
+impedance source.
+
+The `has_temperature_probe` and `has_capacitor_bank_monitor`
+properties tell which options are wired, and `read_temperature()` and
 `read_capacitor_bank_voltage()` raise `NotImplementedError` when the
-option is absent.
-
-The revision is determined in this order:
-
-1. The value provisioned in the device EEPROM. Store it once per
-   board with:
-   ```
-   smartiris set_board_version 1
-   ```
-   It lives in EEPROM, survives firmware updates (and lives next to
-   the clock calibration), and is the deterministic answer. This
-   requires current firmware on the device.
-2. Otherwise it is detected on the fly: v1 boards leave the whole ADC
-   header unwired (the lines are pulled towards VCC and every channel
-   saturates, or hover near 0), while the v2 sources sit at plausible
-   stable voltages: the TMP36 between -20 and +60 degC, and the bank
-   divider above 4.2 V whenever the controller is powered. A source
-   check (the `test_pullup` firmware command, which reads a channel
-   with the MCU internal ~30 kOhm pull-up enabled) confirms the TMP36
-   is a low impedance source, not a leak dragged towards a rail.
-3. A session can always override with `smartiris --board-version`.
+option is absent. A session can override the revision with
+`smartiris --board-version`.
 
 Usage
 -----
@@ -218,12 +215,6 @@ file.
   autodetected by the other commands when `--tty` is omitted, provided
   exactly one compatible device is connected.  
   Example: `smartiris devices`
-
-- `set_board_version {1,2}`  
-  Store the hardware revision of the device in its EEPROM so that it
-  no longer needs to be autodetected (survives firmware updates,
-  requires current firmware).  
-  Example: `smartiris set_board_version 1`
 
 - `disable_buttons`  
   Disable the on-board buttons to avoid interference with remote controle

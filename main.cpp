@@ -33,8 +33,7 @@ void get_clock_calibration(uint8_t rb);
 void set_clock_calibration(uint8_t rb);
 void read_adc(uint8_t rb);
 void test_pullup(uint8_t rb);
-void get_board_version(uint8_t rb);
-void set_board_version(uint8_t rb);
+void get_firmware_version(uint8_t rb);
 void read_signature_row(uint8_t rb);
 void switch_button();
 
@@ -96,7 +95,7 @@ uint8_t n_record = 0;
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+15;
+const uint8_t NFUNC = 2+14;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -117,8 +116,7 @@ void (*func[NFUNC])(uint8_t rb) =
    read_adc,
    read_signature_row,
    test_pullup,
-   get_board_version,
-   set_board_version,
+   get_firmware_version,
   };
 
 const char* command_names[NFUNC*3] =
@@ -138,8 +136,7 @@ const char* command_names[NFUNC*3] =
    "read_adc", "B", "H",
    "read_signature_row", "H", "B",
    "test_pullup", "B", "H",
-   "get_board_version", "", "B",
-   "set_board_version", "B", "",
+   "get_firmware_version", "", "BBBB",
   };
 
 
@@ -471,36 +468,24 @@ void test_pullup(uint8_t rb){
   client.snd((uint8_t *) &result, 2, STATUS_OK);
 }
 
-// The hardware revision is stored in EEPROM (a magic byte next to the
-// value) once provisioned with "smartiris set_board_version", so that
-// hosts no longer need to guess it. Address 0..3 hold the clock
-// calibration float.
-#define BOARD_ID_MAGIC 0x5A
-#define BOARD_ID_ADDR  4
+// Firmware identity. The version follows the project release (see
+// pyproject.toml; the Makefile passes it in). BOARD_VERSION selects
+// the hardware this build targets: "make flash" builds for v2 boards,
+// "make flashv1" for the legacy v1 boards. The host reads all of it
+// and cross checks the target against the wired options.
+#ifndef FIRMWARE_VERSION_MAJOR
+#define FIRMWARE_VERSION_MAJOR 0
+#define FIRMWARE_VERSION_MINOR 0
+#define FIRMWARE_VERSION_PATCH 0
+#endif
+#ifndef BOARD_VERSION
+#define BOARD_VERSION 2
+#endif
 
-void get_board_version(uint8_t rb){
-  uint8_t version = 0xFF; // Not provisioned
-  if (eeprom_read_byte((uint8_t*)BOARD_ID_ADDR) == BOARD_ID_MAGIC)
-    version = eeprom_read_byte((uint8_t*)(BOARD_ID_ADDR+1));
-  client.snd(&version, 1, STATUS_OK);
-}
-
-void set_board_version(uint8_t rb){
-  uint8_t version = *((uint8_t *) (client.read_buffer + rb));
-  if (version != 1 && version != 2){
-    client.sndstatus(STATUS_ERROR);
-    return;
-  }
-  // Skip the write when already provisioned with this value (EEPROM
-  // has a limited number of write cycles).
-  if (!(eeprom_read_byte((uint8_t*)BOARD_ID_ADDR) == BOARD_ID_MAGIC &&
-        eeprom_read_byte((uint8_t*)(BOARD_ID_ADDR+1)) == version)){
-    // Write the value before the magic byte so a half written
-    // provision is never read as valid.
-    eeprom_write_byte((uint8_t*)(BOARD_ID_ADDR+1), version);
-    eeprom_write_byte((uint8_t*)BOARD_ID_ADDR, BOARD_ID_MAGIC);
-  }
-  client.sndstatus(STATUS_OK);
+void get_firmware_version(uint8_t rb){
+  uint8_t info[4] = {FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR,
+                     FIRMWARE_VERSION_PATCH, BOARD_VERSION};
+  client.snd(info, 4, STATUS_OK);
 }
 
 

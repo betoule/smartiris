@@ -48,6 +48,7 @@ class SmartIris(bincoms.SerialBC):
         self.board_version_source = ('declared' if board_version
                                      is not None else None)
         self._v2_features = None
+        self._firmware_info = None
 
     def _probe_v2_features(self):
         """Discover which of the v2-only ADC channels are actually wired.
@@ -97,65 +98,72 @@ class SmartIris(bincoms.SerialBC):
         bank_present = readings['U_BANK'] >= 700
         return {'TMP36': tmp36_present, 'U_BANK': bank_present}
 
-    def _stored_board_version(self):
-        """The revision provisioned in the device EEPROM, or None."""
-        if hasattr(self, 'get_board_version'):
-            version = self.get_board_version()
-            if version in (1, 2):
-                return version
-        return None
-
     @property
     def _v2_present(self):
         if self._v2_features is None:
-            if self._board_version is None:
-                stored = self._stored_board_version()
-                if stored is not None:
-                    self._board_version = stored
-                    self.board_version_source = 'eeprom'
-            if self._v2_features is None:
-                if self._board_version is not None:
-                    driven = self._board_version >= 2
-                    self._v2_features = dict.fromkeys(
-                        ('TMP36', 'U_BANK'), driven)
-                else:
-                    self._v2_features = self._probe_v2_features()
+            if self._board_version is not None:
+                driven = self._board_version >= 2
+                self._v2_features = dict.fromkeys(('TMP36', 'U_BANK'),
+                                                  driven)
+            else:
+                self._v2_features = self._probe_v2_features()
         return self._v2_features
+
+    @property
+    def firmware_info(self):
+        """(major, minor, patch, board_target) as compiled into the
+        device firmware, or None if it predates version reporting."""
+        if (self._firmware_info is None
+                and hasattr(self, 'get_firmware_version')):
+            self._firmware_info = tuple(self.get_firmware_version())
+        return self._firmware_info
+
+    @property
+    def firmware_version(self):
+        """The device firmware release as (major, minor, patch), or
+        None if it predates version reporting."""
+        info = self.firmware_info
+        return info[:3] if info else None
+
+    @property
+    def firmware_board_target(self):
+        """The hardware revision this firmware was built for (v1
+        builds are flashed with 'make flashv1'), or None if the
+        firmware predates version reporting."""
+        info = self.firmware_info
+        return info[3] if info else None
 
     @property
     def board_version(self):
         """Hardware revision of the connected board: 1 or 2.
 
-        Taken from the revision provisioned in the device EEPROM (see
-        provision_board_version) when present, otherwise detected from
-        the presence of the v2-only options (external temperature
-        probe and capacitor bank monitor, see _probe_v2_features).
-        board_version_source tells which: 'eeprom', 'detected' or
-        'declared' (when given explicitly to the constructor)."""
+        Detected from the presence of the v2-only options (external
+        temperature probe and capacitor bank monitor, see
+        _probe_v2_features) and cross-checked with the hardware
+        revision the device firmware was built for ('make flashv1'
+        builds for v1 boards): board_version_source then reads
+        'firmware' when both agree, 'detected' otherwise (firmware
+        without identity reporting, or a mismatch, which is also
+        warned about — the hardware measurement wins). 'declared' when
+        given explicitly to the constructor."""
         if self._board_version is None:
-            self._v2_present  # may pick up an EEPROM provision
-        if self._board_version is None:
-            self._board_version = (2 if any(self._v2_features.values())
+            self._board_version = (2 if any(self._v2_present.values())
                                    else 1)
             self.board_version_source = 'detected'
+            target = self.firmware_board_target
+            if target in (1, 2):
+                if target == self._board_version:
+                    self.board_version_source = 'firmware'
+                else:
+                    import warnings
+                    warnings.warn(
+                        f'The device firmware is built for a v{target} '
+                        f'board while the wired options look like a '
+                        f'v{self._board_version} board. Flash the '
+                        f'matching build ("make '
+                        f'{"flashv1" if self._board_version == 1 else "flash"}'
+                        f'"). Trusting the hardware.')
         return self._board_version
-
-    def provision_board_version(self, version):
-        """Store the hardware revision (1 or 2) in the device EEPROM.
-
-        The value then takes precedence over autodetection at every
-        later connection. It lives in EEPROM, so it survives firmware
-        updates. Requires current firmware on the device."""
-        if version not in (1, 2):
-            raise ValueError('Board version must be 1 or 2')
-        if not hasattr(self, 'set_board_version'):
-            raise NotImplementedError(
-                'The device firmware cannot store a board version. '
-                'Update the firmware (make flash) and retry.')
-        self.set_board_version(version)
-        self._board_version = version
-        self.board_version_source = 'eeprom'
-        self._v2_features = None  # recompute from the new version
 
     @property
     def has_temperature_probe(self):
