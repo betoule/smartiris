@@ -64,8 +64,7 @@ def serial_ports():
 def get_device(ctx: typer.Context) -> SmartIris:
     config = ctx.obj
     return SmartIris(dev=config['tty'], baudrate=115200,
-                     debug=config['verbose'], reset=config['reset'],
-                     board_version=config['board'])
+                     debug=config['verbose'], reset=config['reset'])
 
 
 @app.callback()
@@ -97,18 +96,10 @@ def main(
     reset: Annotated[
         bool, typer.Option('-r', '--reset',
                            help='Hard reset the device at startup')] = False,
-    board: Annotated[
-        int, typer.Option(
-            '--board-version', min=0, max=2,
-            help='Declare the hardware revision of the device (1 or 2), '
-            'for devices whose firmware cannot report it. Firmware '
-            'built with "make flash" (v2) or "make flashv1" (v1) '
-            'reports the revision it targets.')] = 0,
 ):
     """Operate an iris blade shutter"""
     ctx.obj = {'tty': tty, 'pulse_width': pulse_width * 1e-3,
-               'port': port.value, 'verbose': verbose, 'reset': reset,
-               'board': board or None}
+               'port': port.value, 'verbose': verbose, 'reset': reset}
 
 
 @app.command()
@@ -230,8 +221,8 @@ def status(ctx: typer.Context,
     table.add_column('value')
     bv = d.board_version
     table.add_row('Board', f'v{bv} ({d.board_version_source})' if bv
-                  else f'unknown ({d.board_version_source}: update the '
-                       'firmware or pass --board-version)')
+                  else f'unknown ({d.board_version_source}, flash the '
+                       'build matching the board)')
     fw = d.firmware_version
     table.add_row('Firmware', '.'.join(map(str, fw)) if fw
                   else 'unknown (predates version reporting)')

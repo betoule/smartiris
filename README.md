@@ -138,9 +138,9 @@ Two cases do not report a target. Firmware older than the v2
 hardware has no ADC commands at all, which places it reliably on a
 v1 board. Firmware of the interim era (ADC commands, no reporting)
 cannot tell its board: the revision is left unknown rather than
-guessed, and the v2-only features stay usable as they always were —
-update such a board's firmware, or declare its revision with
-`smartiris --board-version`.
+guessed, and the v2-only features stay usable as they always were.
+The fix in both cases is the same — flash the build matching the
+board — and `smartiris status` says so.
 
 The `has_temperature_probe` and `has_capacitor_bank_monitor`
 properties tell which options the revision provides, and
@@ -187,10 +187,6 @@ file.
   Enable debug output for communication.
 - `-r, --reset`  
   Perform a hard reset of the device on startup. The execution of the command is slower at first call.
-- `--board-version {1,2}`  
-  Declare the hardware revision of the device, for devices whose  
-  firmware cannot report it  
-  (see [Hardware revisions](#hardware-revisions-v1-and-v2) below).
 
 #### Commands
 - `open`  

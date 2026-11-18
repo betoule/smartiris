@@ -29,14 +29,11 @@ class SmartIris(bincoms.SerialBC):
         time_resolution (float): The timer resolution in seconds (default: 0.5e-6).
     """
 
-    def __init__(self, *args, board_version=None, **keys):
+    def __init__(self, *args, **keys):
         """Initialize the SmartIris instance.
 
         Args:
             *args: Variable length argument list passed to the parent class.
-            board_version: Declare the hardware revision (1 or 2), for
-                devices whose firmware cannot report it. See the
-                board_version property.
             **keys: Keyword arguments passed to the parent class.
         """
         super().__init__(*args, **keys)
@@ -44,9 +41,8 @@ class SmartIris(bincoms.SerialBC):
         # Read mcu temperature sensor calibration constants
         self._ts_offset = self.read_signature_row(0x0002)
         self._ts_gain = self.read_signature_row(0x0003)
-        self._board_version = board_version
-        self.board_version_source = ('declared' if board_version
-                                     is not None else None)
+        self._board_version = None
+        self.board_version_source = None
         self._v2_features = None
         self._firmware_info = None
 
@@ -104,10 +100,9 @@ class SmartIris(bincoms.SerialBC):
         altogether, which reliably places it on a v1 board (source
         'pre-v2 firmware'). Firmware of the interim era (ADC commands
         but no identity reporting) leaves the revision unknown (None,
-        source 'unknown'): update the firmware, or declare the board
-        with SmartIris(board_version=...). Nothing is ever guessed
-        from the analog levels of possibly unwired ADC pins, which
-        can sit at any level.
+        source 'unknown'): flash it with the build matching its
+        revision. Nothing is ever guessed from the analog levels of
+        possibly unwired ADC pins, which can sit at any level.
         """
         if self._board_version is None and self.board_version_source is None:
             target = self.firmware_board_target
