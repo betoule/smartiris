@@ -160,19 +160,42 @@ def timed(ctx: typer.Context,
 
 @app.command()
 def devices():
-    """List the connected bincom compatible devices. Use --tty to select
-    one when several are found."""
-    import serial.tools.list_ports
+    """List the connected bincom compatible devices, with their board
+    revision and firmware version. Use --tty to select one when
+    several are found."""
+    import glob
+    import os
     from bincoms import find_devices
     found = find_devices()
     if not found:
         print('No compatible device found')
         raise typer.Exit(1)
-    port_info = {p.device: p for p in serial.tools.list_ports.comports()}
+    # Map the kernel device nodes to their stable /dev/serial/by-id
+    # names (Linux only, where they exist).
+    by_id = {}
+    for link in glob.glob('/dev/serial/by-id/*'):
+        by_id.setdefault(os.path.realpath(link), []).append(
+            os.path.basename(link))
+    from rich.console import Console
+    from rich.table import Table
+    table = Table(box=None, pad_edge=False)
+    table.add_column('device', style='bold')
+    table.add_column('board')
+    table.add_column('firmware')
+    table.add_column('by-id', overflow='fold')
     for dev in found:
-        info = port_info.get(dev)
-        extra = f' - {info.description}' if info else ''
-        print(f'{dev}{extra}')
+        try:
+            d = SmartIris(dev=dev, baudrate=115200)
+            board = f'v{d.board_version} ({d.board_version_source})'
+            fw = d.firmware_version
+            firmware = '.'.join(map(str, fw)) if fw else 'unknown'
+            d.com.close()
+        except Exception as e:
+            board = firmware = f'unreachable ({e.__class__.__name__})'
+        table.add_row(
+            dev, board, firmware,
+            '\n'.join(by_id.get(os.path.realpath(dev), [])) or 'n/a')
+    Console().print(table)
 
 
 @app.command()

@@ -214,7 +214,9 @@ file.
   Example: `smartiris status`
 
 - `devices`  
-  List the connected bincom compatible devices. The device is
+  List the connected bincom compatible devices, with for each one its
+  board revision, firmware version and `/dev/serial/by-id` path (the
+  stable name, to pin a board with `--tty`). The device is
   autodetected by the other commands when `--tty` is omitted, provided
   exactly one compatible device is connected.  
   Example: `smartiris devices`
