@@ -357,6 +357,14 @@ def test():
         '-o', '--output-file', default="",
         help='Instead of calibrating the MCU clock register the calibration data into the provided file')
     parser_read = subparsers.add_parser('read', help='Report measured timings of sensor events')
+
+    parser_server = subparsers.add_parser('start_server', help='Start an xmlrpc server exposing the device functionalities. The server daemonizes unless verbose mode is on.')
+    parser_server.add_argument(
+        '-H', '--hostname', default='0.0.0.0',
+        help='Specify the address the server listens to')
+    parser_server.add_argument(
+        '-P', '--server-port', dest='server_port', type=int, default=7913,
+        help='Specify the port the server listens to')
     
     args = parser.parse_args()
         
@@ -386,3 +394,12 @@ def test():
         if len(record) == 2:
             exptime = record[1][0] - record[0][0]
             print(f'Measured exposure time: {exptime} s')
+    elif args.command == 'start_server':
+        from . import daemon_servers
+        daemon_servers.setup_logging('smartiris')
+        server = daemon_servers.BasicServer((args.hostname, args.server_port), 'smartiris', d)
+        print(f'Listening on http://{args.hostname}:{args.server_port}')
+        if not args.verbose:
+            daemon_servers.daemonize(server)
+        else:
+            server.main()

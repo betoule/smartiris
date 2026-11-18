@@ -155,6 +155,20 @@ smartiris [OPTIONS] COMMAND
 - `enable_button`  
   Re-enable the on-board buttons. They will have precedence over remote operations
 
+- `start_server`  
+  Start an xmlrpc server exposing all the device functionalities over the
+  network (used in particular by the StarDICE scheduler). The server
+  daemonizes unless `--verbose` is set, in which case it runs in the
+  foreground and prints communication debugging info.  
+  Additional options:  
+  - `-H, --hostname ADDRESS`  
+    Address the server listens to (default: `0.0.0.0`).  
+  - `-P, --server-port PORT`  
+    Port the server listens to (default: `7913`).  
+  Example: `smartiris start_server -P 8773`  
+  Logs are written to `~/logs/smartiris-server-<date>.log`. The daemon can be
+  stopped with `killall smartiris`.
+
 #### Examples
 - Open the shutter with a custom pulse width on port B:  
   `smartiris -p B -w 25 open`
