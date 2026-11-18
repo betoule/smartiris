@@ -6,6 +6,15 @@ __pycache__/
 # C extensions
 *.so
 
+# AVR build artifacts
+*.o
+*.elf
+*.hex
+*.eep
+*.bin
+build-nano-atmega328/
+build-mega-atmega2560/
+
 # Distribution / packaging
 .Python
 build/

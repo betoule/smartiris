@@ -12,9 +12,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#include <Arduino.h>
+#define F_CPU 16000000UL
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/eeprom.h>
 #include "bincoms.h"
-#include <EEPROM.h>
 
 /* The main fonction of the API. Send a pulse of a given duration on
    the given line.
@@ -73,7 +75,7 @@ uint8_t n_record = 0;
 // interrupt and record incorrect timing because of that.
 #define INTERRUPT_HANDLER(line)                                    \
   sensor_timing_record[n_record].time_LB = TCNT1;                   \
-  PINB |= _BV(PB5);                                                  \ 
+  PINB |= _BV(PB5);                                                  \
   if ((TIFR1 & 0b1) && (sensor_timing_record[n_record].time_LB < 10)){\
     timeHB++;							   \
     TIFR1 |= _BV(TOV1);						   \
@@ -241,8 +243,11 @@ ISR(INT1_vect){
   INTERRUPT_HANDLER(0b10)
 }
 
-void loop(){
-  // This shunt the arduino loop
+int main(void){
+  setup();
+  // Set global interrupt enable. This used to be done by the
+  // arduino core main function.
+  sei();
   client.serve_serial();
 }
 
@@ -395,14 +400,14 @@ void status(uint8_t rb){
 
 void get_clock_calibration(uint8_t rb){
   float calibration_constant = 2e6;
-  EEPROM.get(0, calibration_constant);
+  calibration_constant = eeprom_read_float((float*)0);
   client.snd((uint8_t*) &calibration_constant, 4, STATUS_OK);
 }
 
 void set_clock_calibration(uint8_t rb){
   float calibration_constant = 2e6;
   client.readn(&rb, (uint8_t*) &calibration_constant, 4);
-  EEPROM.put(0, calibration_constant);
+  eeprom_write_float((float*)0, calibration_constant);
   client.sndstatus(STATUS_OK);
 }
 

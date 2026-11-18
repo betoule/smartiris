@@ -98,7 +98,22 @@ ls /dev/tty*.*
 
 * Schematics is available in directory `schematics`
 * Files to build a 3D case are available in `3D`
-* Once assembled connect your computer to the arduino and flash the firmware using the arduino IDE. The code is compatible with version 1.8 of the IDE. Open the sketch `smartiris.ino` and upload the sketch.
+* Once assembled connect your computer to the arduino and flash the
+  firmware. The MCU code does not require the Arduino IDE. It is
+  compiled and flashed using the regular avr suite:
+  + Install everything needed with:
+    ```
+    sudo apt install gcc-avr avr-libc avrdude make
+    ```
+  + Adjust the `PORT`, `BAUD` and `PROGRAMMER` entries of the
+    `Makefile` according to your board (`BAUD` is the bootloader
+    baud: `57600` for the classic Nano bootloader, `115200` for
+    Optiboot).
+  + Connect the board, compile and upload the firmware with:
+    ```
+    make
+    make flash
+    ```
 
 Usage
 -----
