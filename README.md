@@ -177,10 +177,16 @@ file.
   Display the current status of the shutter driver.  
   Example: `smartiris status`
 
-- `disable_button`  
+- `devices`  
+  List the connected bincom compatible devices. The device is
+  autodetected by the other commands when `--tty` is omitted, provided
+  exactly one compatible device is connected.  
+  Example: `smartiris devices`
+
+- `disable_buttons`  
   Disable the on-board buttons to avoid interference with remote controle
 
-- `enable_button`  
+- `enable_buttons`  
   Re-enable the on-board buttons. They will have precedence over remote operations
 
 - `start_server`  

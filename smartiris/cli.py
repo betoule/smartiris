@@ -34,7 +34,9 @@ from smartiris import SmartIris
 app = typer.Typer(no_args_is_help=True,
                   help='Operate an iris blade shutter.')
 
-DEFAULT_TTY = '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_BG003I0G-if00-port0'
+# Empty means: autodetect among the connected compatible devices
+# (see bincoms.find_devices and the `devices` command below).
+DEFAULT_TTY = ''
 
 
 class PortName(str, Enum):
@@ -69,8 +71,11 @@ def get_device(ctx: typer.Context) -> SmartIris:
 def main(
     ctx: typer.Context,
     tty: Annotated[
-        str, typer.Option('-t', '--tty', autocompletion=tty_completer,
-                          help='link to a specific tty port')] = DEFAULT_TTY,
+        str, typer.Option(
+            '-t', '--tty', autocompletion=tty_completer,
+            help='link to a specific tty port. When omitted, the device '
+            'is autodetected among the connected compatible devices '
+            '(see the devices command)')] = DEFAULT_TTY,
     pulse_width: Annotated[
         float, typer.Option(
             '-w', '--pulse-width', min=5., max=35.,
@@ -142,6 +147,23 @@ def timed(ctx: typer.Context,
     d = get_device(ctx)
     d.timed_shutter(port=config['port'], pulsewidth_sec=config['pulse_width'],
                     duration_sec=exposure_time, delay_sec=delay, echo=echo)
+
+
+@app.command()
+def devices():
+    """List the connected bincom compatible devices. Use --tty to select
+    one when several are found."""
+    import serial.tools.list_ports
+    from bincoms import find_devices
+    found = find_devices()
+    if not found:
+        print('No compatible device found')
+        raise typer.Exit(1)
+    port_info = {p.device: p for p in serial.tools.list_ports.comports()}
+    for dev in found:
+        info = port_info.get(dev)
+        extra = f' - {info.description}' if info else ''
+        print(f'{dev}{extra}')
 
 
 @app.command()

@@ -49,8 +49,9 @@ def find_devices():
         if port.vid is not None:
             try:
                 device = SerialBC(dev=port.device)
+                device.com.close()
                 devices.append(port.device)
-            except ValueError:
+            except Exception:
                 pass
     return devices
             
