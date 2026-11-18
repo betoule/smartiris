@@ -115,6 +115,25 @@ ls /dev/tty*.*
     make flash
     ```
 
+### Hardware revisions (v1 and v2)
+
+The same firmware and host software run on both hardware revisions.
+The v2 boards add two options that the v1 boards lack: an external
+TMP36 temperature probe (ADC0) and a voltage divider monitoring the
+capacitor bank (ADC1). Both inputs are unwired on v1 boards.
+
+The host detects the board revision on first use (`board_version`,
+shown by `smartiris status`) by checking that those ADC channels sit
+at voltages their sources could not go below (a floating input hovers
+near 0). The `has_temperature_probe` and `has_capacitor_bank_monitor`
+properties tell which options are wired, and `read_temperature()` /
+`read_capacitor_bank_voltage()` raise `NotImplementedError` on v1
+boards. The detection can be overridden with
+`SmartIris(board_version=...)` or `smartiris --board-version`.
+The firmware also exposes a `test_pullup(channel)` primitive: it reads
+an ADC channel with the MCU internal ~30 kOhm pull-up enabled, which
+distinguishes a low-impedance source from a floating input.
+
 Usage
 -----
 ### Command line
@@ -150,6 +169,9 @@ file.
   Enable debug output for communication.
 - `-r, --reset`  
   Perform a hard reset of the device on startup. The execution of the command is slower at first call.
+- `--board-version {1,2}`  
+  Declare the hardware revision of the device instead of autodetecting
+  it (see [Hardware revisions](#hardware-revisions-v1-and-v2) below).
 
 #### Commands
 - `open`  

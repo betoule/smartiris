@@ -64,7 +64,8 @@ def serial_ports():
 def get_device(ctx: typer.Context) -> SmartIris:
     config = ctx.obj
     return SmartIris(dev=config['tty'], baudrate=115200,
-                     debug=config['verbose'], reset=config['reset'])
+                     debug=config['verbose'], reset=config['reset'],
+                     board_version=config['board'])
 
 
 @app.callback()
@@ -96,10 +97,18 @@ def main(
     reset: Annotated[
         bool, typer.Option('-r', '--reset',
                            help='Hard reset the device at startup')] = False,
+    board: Annotated[
+        int, typer.Option(
+            '--board-version', min=0, max=2,
+            help='Declare the hardware revision of the device (1 or 2). '
+            'By default it is autodetected from the wired options (the '
+            'v2 boards have the external temperature probe and the '
+            'capacitor bank monitor that the v1 boards lack).')] = 0,
 ):
     """Operate an iris blade shutter"""
     ctx.obj = {'tty': tty, 'pulse_width': pulse_width * 1e-3,
-               'port': port.value, 'verbose': verbose, 'reset': reset}
+               'port': port.value, 'verbose': verbose, 'reset': reset,
+               'board': board or None}
 
 
 @app.command()
@@ -195,6 +204,7 @@ def status(ctx: typer.Context,
     table = Table(box=None, show_header=False, pad_edge=False)
     table.add_column('property', style='bold')
     table.add_column('value')
+    table.add_row('Board', f'v{d.board_version}')
     table.add_row('Shutter A', shutter(st['shutter_A']))
     table.add_row('Shutter B', shutter(st['shutter_B']))
     table.add_row('Program', program)

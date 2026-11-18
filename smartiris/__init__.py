@@ -29,11 +29,14 @@ class SmartIris(bincoms.SerialBC):
         time_resolution (float): The timer resolution in seconds (default: 0.5e-6).
     """
 
-    def __init__(self, *args, **keys):
+    def __init__(self, *args, board_version=None, **keys):
         """Initialize the SmartIris instance.
 
         Args:
             *args: Variable length argument list passed to the parent class.
+            board_version: Declare the hardware revision (1 or 2) instead
+                of letting it be autodetected from the wired options on
+                first use. See the board_version property.
             **keys: Keyword arguments passed to the parent class.
         """
         super().__init__(*args, **keys)
@@ -41,7 +44,69 @@ class SmartIris(bincoms.SerialBC):
         # Read mcu temperature sensor calibration constants
         self._ts_offset = self.read_signature_row(0x0002)
         self._ts_gain = self.read_signature_row(0x0003)
-        
+        self._board_version = board_version
+        self._v2_features = None
+
+    def _probe_v2_features(self):
+        """Discover which of the v2-only ADC channels are actually wired.
+
+        v2 boards drive ADC0 with the external TMP36 temperature probe
+        and ADC1 with a voltage divider monitoring the capacitor bank.
+        Both inputs are unwired on v1 boards, where floating nets hover
+        near 0 whatever is done to them (including enabling the
+        internal pull-up, see the test_pullup firmware command). Hence
+        a channel is considered wired when the median of a few samples
+        sits at a voltage its source could not go below: 0.43 V for the
+        TMP36 (it outputs 0.5 V at -20 degC), and 0.75 V (~4.2 V on
+        the bank) for the divider, the bank being charged as soon as
+        the controller is powered."""
+        if not hasattr(self, 'read_adc'):
+            # The ADC commands appeared along with the v2 boards: a
+            # firmware without them predates them.
+            return {'TMP36': False, 'U_BANK': False}
+
+        def wired(name, floor):
+            readings = sorted(self.read_adc(adc_pin_maps[name])
+                              for _ in range(3))
+            return readings[1] > floor
+
+        return {'TMP36': wired('TMP36', 400),
+                'U_BANK': wired('U_BANK', 700)}
+
+    @property
+    def _v2_present(self):
+        if self._v2_features is None:
+            if self._board_version is not None:
+                driven = self._board_version >= 2
+                self._v2_features = dict.fromkeys(('TMP36', 'U_BANK'),
+                                                  driven)
+            else:
+                self._v2_features = self._probe_v2_features()
+        return self._v2_features
+
+    @property
+    def board_version(self):
+        """Hardware revision of the connected board: 1 or 2.
+
+        Detected from the presence of the v2-only options (external
+        temperature probe and capacitor bank monitor, see
+        _probe_v2_features) unless declared explicitly with
+        SmartIris(board_version=...)."""
+        if self._board_version is None:
+            self._board_version = (2 if any(self._v2_present.values())
+                                   else 1)
+        return self._board_version
+
+    @property
+    def has_temperature_probe(self):
+        """Whether the external TMP36 temperature probe is wired (v2)."""
+        return self._v2_present['TMP36']
+
+    @property
+    def has_capacitor_bank_monitor(self):
+        """Whether the capacitor bank voltage divider is wired (v2)."""
+        return self._v2_present['U_BANK']
+
     def get_frequency(self):
         ''' Return the mcu clock frequency. Nominal or calibrated if avaialable'''
         freq = self.get_clock_calibration()
@@ -197,16 +262,25 @@ class SmartIris(bincoms.SerialBC):
         return (V_adc - 273 + 100 - self._ts_offset)*128/self._ts_gain + 25
     
     def read_temperature(self):
-        """ Read the TMP36 temperature in deg C
+        """ Read the TMP36 temperature in deg C (v2 boards only)
         """
+        if not self.has_temperature_probe:
+            raise NotImplementedError(
+                'No external temperature probe detected on this v1 '
+                'board. The chip temperature remains available with '
+                'read_mcu_temperature().')
         V_adc = self.read_adc(adc_pin_maps['TMP36']) * 1.1/1024
         # 10 mV / deg and 750mV @ 25
         temp = 25 + (V_adc - 0.75) * 100
         return temp
 
     def read_capacitor_bank_voltage(self):
-        """ Read the capacitor bank voltage in V
+        """ Read the capacitor bank voltage in V (v2 boards only)
         """
+        if not self.has_capacitor_bank_monitor:
+            raise NotImplementedError(
+                'No capacitor bank voltage divider detected on this v1 '
+                'board.')
         V_adc = self.read_adc(adc_pin_maps['U_BANK']) * 1.1/1024
         return 46 / 10 * V_adc # Divider 10k/36k
 
