@@ -14,7 +14,6 @@
 
 import bincoms
 import math
-import struct
 import time
 
 
@@ -120,16 +119,18 @@ class SmartIris(bincoms.SerialBC):
 
     @property
     def has_temperature_probe(self):
-        """Whether the external TMP36 temperature probe is wired (v2)."""
+        """Whether this board revision provides the external TMP36
+        temperature probe (v2 boards)."""
         return self._v2_present['TMP36']
 
     @property
     def has_capacitor_bank_monitor(self):
-        """Whether the capacitor bank voltage divider is wired (v2)."""
+        """Whether this board revision provides the capacitor bank
+        voltage divider (v2 boards)."""
         return self._v2_present['U_BANK']
 
     def get_frequency(self):
-        ''' Return the mcu clock frequency. Nominal or calibrated if avaialable'''
+        ''' Return the mcu clock frequency. Nominal or calibrated if available'''
         freq = self.get_clock_calibration()
         if math.isnan(freq):
             import warnings
@@ -162,17 +163,6 @@ class SmartIris(bincoms.SerialBC):
             int: The number of timer counts, rounded to the nearest integer.
         """
         return int(round(seconds * self.frequency))
-
-#    def async_packet_read(self):
-#        """Read and unpack an asynchronous response packet from the device.
-#
-#        Returns:
-#            tuple: A tuple containing two values unpacked from the response
-#                (format: '<IB', little-endian unsigned int and byte).
-#        """
-#        ans = self.rcv()
-#        answer = struct.unpack('<IB', ans)
-#        return answer
 
     def pulse_sec(self, pin, pulsewidth_sec):
         """Generate a pulse on the specified pin for a given duration.
@@ -262,9 +252,10 @@ class SmartIris(bincoms.SerialBC):
             self.start_program()
 
     def read_program(self):
-        """Print the programmed pulse sequence for debugging.
+        """Read back the programmed pulse sequence.
 
-        Reads and displays the program steps (up to 4) from the device.
+        Returns:
+            list: The program steps (up to 4) as read from the device.
         """
         program_length = self.status()['program_length']
         return [self.get_program(i, 0) for i in range(program_length)]
@@ -287,8 +278,8 @@ class SmartIris(bincoms.SerialBC):
         """
         if not self.has_temperature_probe:
             raise NotImplementedError(
-                'No external temperature probe detected on this v1 '
-                'board. The chip temperature remains available with '
+                'This v1 board has no external temperature probe. The '
+                'chip temperature remains available with '
                 'read_mcu_temperature().')
         V_adc = self.read_adc(adc_pin_maps['TMP36']) * 1.1/1024
         # 10 mV / deg and 750mV @ 25
@@ -300,8 +291,7 @@ class SmartIris(bincoms.SerialBC):
         """
         if not self.has_capacitor_bank_monitor:
             raise NotImplementedError(
-                'No capacitor bank voltage divider detected on this v1 '
-                'board.')
+                'This v1 board has no capacitor bank voltage divider.')
         V_adc = self.read_adc(adc_pin_maps['U_BANK']) * 1.1/1024
         return 46 / 10 * V_adc # Divider 10k/36k
 

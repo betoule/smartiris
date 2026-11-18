@@ -232,6 +232,24 @@ file.
 - `enable_buttons`  
   Re-enable the on-board buttons. They will have precedence over remote operations
 
+- `calibrate`  
+  Calibrate the MCU clock register against NTP time, for timings more
+  precise than the nominal oscillator tolerance. The calibration is
+  stored in the device EEPROM.  
+  Additional options:  
+  - `-d, --duration MINUTES`  
+    Duration of the calibration procedure (default: `1`).  
+  - `-o, --output-file PATH`  
+    Save the raw calibration data to a file instead of adjusting the  
+    device clock register.  
+  Example: `smartiris calibrate`
+
+- `read`  
+  Report the timings of the events recorded by the board sensors (the
+  actual shutter openings detected by optosensors), and the measured
+  exposure time when two events allow it.  
+  Example: `smartiris read`
+
 - `start_server`  
   Start an xmlrpc server exposing all the device functionalities over the
   network (used in particular by the StarDICE scheduler). The server

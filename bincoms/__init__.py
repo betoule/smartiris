@@ -47,8 +47,8 @@ class SeveralDevicesError(IOError):
         self.candidates = [d._dev for d in candidates]
         super().__init__(
             f'Several compatible devices found: {self.candidates}. '
-            'Please specify which one to use with smartiris '
-            '-t [device_path]')
+            'Please specify which one to use with the dev parameter '
+            '(--tty on the command line)')
 
 
 def find_devices(keep_open=False):
