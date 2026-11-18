@@ -184,8 +184,23 @@ def status(ctx: typer.Context,
     d = get_device(ctx)
     if raw:
         print(d.raw_status())
-    else:
-        print(d.status())
+        return
+    from rich.console import Console
+    from rich.table import Table
+    st = d.status()
+    green = lambda v: f'[green]{v}[/green]'
+    yellow = lambda v: f'[yellow]{v}[/yellow]'
+    shutter = lambda v: green(v) if v == 'open' else yellow(v)
+    program = green('idle') if not st['busy'] else yellow('running')
+    table = Table(box=None, show_header=False, pad_edge=False)
+    table.add_column('property', style='bold')
+    table.add_column('value')
+    table.add_row('Shutter A', shutter(st['shutter_A']))
+    table.add_row('Shutter B', shutter(st['shutter_B']))
+    table.add_row('Program', program)
+    table.add_row('Program length', str(st['program_length']))
+    table.add_row('Events recorded', str(st['events_recorded']))
+    Console().print(table)
 
 
 @app.command('disable_buttons')
