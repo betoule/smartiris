@@ -148,32 +148,37 @@ class SmartIris(bincoms.SerialBC):
     def board_version(self):
         """Hardware revision of the connected board: 1 or 2.
 
-        Detected from the presence of the v2-only options (external
-        temperature probe and capacitor bank monitor, see
-        _probe_v2_features) and cross-checked with the hardware
-        revision the device firmware was built for ('make flashv1'
-        builds for v1 boards): board_version_source then reads
-        'firmware' when both agree, 'detected' otherwise (firmware
-        without identity reporting, or a mismatch, which is also
-        warned about — the hardware measurement wins). 'declared' when
-        given explicitly to the constructor."""
+        Taken from the revision the device firmware was compiled for
+        ('make flashv1' builds for v1 boards), board_version_source
+        then reading 'firmware'. Firmware too old to report it gets
+        detected from the presence of the v2-only options instead
+        (see _probe_v2_features), source 'detected'. A disagreement
+        between the compiled target and the wired options is warned
+        about. 'declared' when given explicitly to the
+        constructor."""
         if self._board_version is None:
-            self._board_version = (2 if any(self._v2_present.values())
-                                   else 1)
-            self.board_version_source = 'detected'
             target = self.firmware_board_target
             if target in (1, 2):
-                if target == self._board_version:
-                    self.board_version_source = 'firmware'
-                else:
+                # The compiled-in target is the authoritative identity;
+                # the wiring measurement gates the features and serves
+                # as a sanity check only.
+                self._board_version = target
+                self.board_version_source = 'firmware'
+                self._v2_features = self._probe_v2_features()
+                detected = 2 if any(self._v2_features.values()) else 1
+                if detected != target:
                     import warnings
                     warnings.warn(
                         f'The device firmware is built for a v{target} '
                         f'board while the wired options look like a '
-                        f'v{self._board_version} board. Flash the '
-                        f'matching build ("make '
-                        f'{"flashv1" if self._board_version == 1 else "flash"}'
-                        f'"). Trusting the hardware.')
+                        f'v{detected} board. Check the wiring, or flash '
+                        f'the matching build ("make '
+                        f'{"flashv1" if detected == 1 else "flash"}").')
+            else:
+                # Firmware too old to report its identity.
+                self._board_version = (2 if any(
+                    self._v2_present.values()) else 1)
+                self.board_version_source = 'detected'
         return self._board_version
 
     @property

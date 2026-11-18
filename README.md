@@ -127,12 +127,13 @@ The v2 boards add two options the v1 boards lack: an external TMP36
 temperature probe (ADC0) and a voltage divider monitoring the
 capacitor bank (ADC1), both unwired on v1. The firmware reports its
 version (kept in sync with the python package release) and the board
-revision it was built for, which `smartiris status` displays, and the
-host cross-checks that identity against the wired options: flashing a
-build for the wrong revision raises a warning naming the matching
-build, and the hardware measurement always wins. On boards running a
-firmware too old to report its identity, the measurement decides on
-its own: the unwired v1 ADC header is pulled towards VCC (every
+revision it was built for. The compile-time target is the
+authoritative identity, while the host also measures the wired
+options: they gate the features (reading an unwired channel would
+only give noise) and sanity-check the identity — a mismatch warns
+and names the matching build. On boards running a firmware too old
+to report its identity, the measurement decides on its own: the
+unwired v1 ADC header is pulled towards VCC (every
 channel saturates) or hovers near 0, while the v2 sources sit at
 plausible stable voltages (the TMP36 between -20 and +60 degC, the
 bank divider above 4.2 V whenever the controller is powered), the
