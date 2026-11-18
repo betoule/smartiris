@@ -13,11 +13,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import bincoms
-import struct
-import time
-import numpy as np
-
-import numpy as np
+import math
 import struct
 import time
 
@@ -49,7 +45,7 @@ class SmartIris(bincoms.SerialBC):
     def get_frequency(self):
         ''' Return the mcu clock frequency. Nominal or calibrated if avaialable'''
         freq = self.get_clock_calibration()
-        if np.isnan(freq):
+        if math.isnan(freq):
             import warnings
             warnings.warn('The mcu clock is not calibrated. If you need precise timings consider running "smartiris calibrate".')
             return 2e6
@@ -79,7 +75,7 @@ class SmartIris(bincoms.SerialBC):
         Returns:
             int: The number of timer counts, rounded to the nearest integer.
         """
-        return int(np.round(seconds * self.frequency))
+        return int(round(seconds * self.frequency))
 
 #    def async_packet_read(self):
 #        """Read and unpack an asynchronous response packet from the device.

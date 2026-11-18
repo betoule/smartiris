@@ -14,7 +14,6 @@
 
 import struct
 import time
-import numpy as np
 import serial
 import types
 import os
@@ -40,8 +39,13 @@ status_message = ['Action performed successfully',
                   'Not used for now',
                   'The provided arguments are outside the allowed range']
 
-def find_devices():
-    """Discover all bincom compatible devices."""
+def find_devices(keep_open=False):
+    """Discover all bincom compatible devices.
+
+    Returns the paths of the compatible devices. With keep_open=True,
+    returns connected SerialBC instances instead (closed again unless
+    exactly one device was found, so they are ready to be adopted for
+    a single-device autodetect connection)."""
     import serial.tools.list_ports
     ports = serial.tools.list_ports.comports()
     devices = []
@@ -49,10 +53,16 @@ def find_devices():
         if port.vid is not None:
             try:
                 device = SerialBC(dev=port.device)
+            except Exception:
+                continue
+            if keep_open:
+                devices.append(device)
+            else:
                 device.com.close()
                 devices.append(port.device)
-            except Exception:
-                pass
+    if keep_open and len(devices) != 1:
+        for device in devices:
+            device.com.close()
     return devices
             
 def _command_factory(self, f, s, a):
@@ -85,11 +95,19 @@ def _command_factory(self, f, s, a):
 class SerialBC(object):
     def __init__(self, dev='/dev/ttyUSB0', baudrate=115200, debug=False, reset=False):
         if not dev:
-            devices = find_devices()
-            if len(devices) == 1:
-                dev = devices[0]
-            elif len(devices) > 1:
-                raise IOError(f'Several compatible devices found: {devices}. Please specify which one to use with smartiris -t [device_path]')
+            # Autodetect: a single probed device is adopted as-is,
+            # saving a second full connection handshake.
+            candidates = find_devices(keep_open=True)
+            if len(candidates) == 1:
+                probed = candidates[0]
+                probed.debug = debug
+                if reset or baudrate != probed._baudrate:
+                    probed._baudrate = baudrate
+                    probed._open(reset=reset)
+                self.__dict__.update(probed.__dict__)
+                return
+            elif len(candidates) > 1:
+                raise IOError(f'Several compatible devices found: {[d._dev for d in candidates]}. Please specify which one to use with smartiris -t [device_path]')
             else:
                 raise IOError(f'No compatible device found')
 
@@ -124,6 +142,15 @@ class SerialBC(object):
             print('Port set')
         try:
             self.com = serial.Serial(self._dev, baudrate=self._baudrate, timeout=timeout, dsrdtr=None)
+            try:
+                # FTDI based adapters wait up to 16 ms (default
+                # latency timer) before sending a partially filled
+                # USB packet, adding the same delay to every round
+                # trip. Setting the timer to 1 ms makes communication
+                # feel instant. Silently ignored for other chips.
+                self.com.set_low_latency_mode(True)
+            except Exception:
+                pass
         except:
             print('Connexion failed')
         if self.debug:
