@@ -207,7 +207,10 @@ file.
   Example: `smartiris stop`
 
 - `status`  
-  Display the current status of the shutter driver.  
+  Display the current status of the shutter driver: board revision,  
+  firmware version, shutter and program state, and the available  
+  temperatures (always the MCU one, plus the external probe's on v2  
+  boards).  
   Example: `smartiris status`
 
 - `devices`  

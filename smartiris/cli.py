@@ -213,6 +213,11 @@ def status(ctx: typer.Context,
     table.add_row('Program', program)
     table.add_row('Program length', str(st['program_length']))
     table.add_row('Events recorded', str(st['events_recorded']))
+    table.add_row('MCU temperature',
+                  f'{d.read_mcu_temperature():.1f} °C')
+    if d.has_temperature_probe:
+        table.add_row('Probe temperature',
+                      f'{d.read_temperature():.1f} °C')
     Console().print(table)
 
 
