@@ -29,6 +29,7 @@ from typing import Annotated
 
 import typer
 
+from bincoms import SeveralDevicesError
 from smartiris import SmartIris
 
 app = typer.Typer(no_args_is_help=True,
@@ -63,8 +64,72 @@ def serial_ports():
 
 def get_device(ctx: typer.Context) -> SmartIris:
     config = ctx.obj
+    try:
+        return _connect(config)
+    except SeveralDevicesError as e:
+        import sys
+        if not sys.stdin.isatty():
+            # A script, not an operator: keep the plain error.
+            raise
+        config['tty'] = _ask_device(e.candidates)
+        return _connect(config)
+
+
+def _connect(config):
     return SmartIris(dev=config['tty'], baudrate=115200,
                      debug=config['verbose'], reset=config['reset'])
+
+
+def _ask_device(candidates):
+    """List the autodetected candidates and ask the user to pick one."""
+    from rich.console import Console
+    from rich.prompt import Prompt
+    console = Console()
+    console.print('\nSeveral compatible devices found:')
+    console.print(devices_table(candidates, numbered=True))
+    try:
+        n = Prompt.ask('Which device',
+                       choices=[str(i) for i in range(1,
+                                                      len(candidates) + 1)])
+    except (EOFError, KeyboardInterrupt):
+        console.print('No device selected, use --tty to specify one.')
+        raise typer.Exit(1)
+    return candidates[int(n) - 1]
+
+
+def devices_table(devs, numbered=False):
+    """Describe device paths in a rich table: board revision, firmware
+    version and stable /dev/serial/by-id name (Linux only, where the
+    links exist)."""
+    import glob
+    import os
+    from rich.table import Table
+    by_id = {}
+    for link in glob.glob('/dev/serial/by-id/*'):
+        by_id.setdefault(os.path.realpath(link), []).append(
+            os.path.basename(link))
+    table = Table(box=None, pad_edge=False)
+    if numbered:
+        table.add_column('#', justify='right')
+    table.add_column('device', style='bold')
+    table.add_column('board')
+    table.add_column('firmware')
+    table.add_column('by-id', overflow='fold')
+    for n, dev in enumerate(devs, 1):
+        try:
+            d = SmartIris(dev=dev, baudrate=115200)
+            bv = d.board_version
+            board = f'v{bv} ({d.board_version_source})' if bv else 'unknown'
+            fw = d.firmware_version
+            firmware = '.'.join(map(str, fw)) if fw else 'unknown'
+            d.com.close()
+        except Exception as e:
+            board = firmware = f'unreachable ({e.__class__.__name__})'
+        table.add_row(
+            *([str(n)] if numbered else []),
+            dev, board, firmware,
+            '\n'.join(by_id.get(os.path.realpath(dev), [])) or 'n/a')
+    return table
 
 
 @app.callback()
@@ -152,42 +217,15 @@ def timed(ctx: typer.Context,
 @app.command()
 def devices():
     """List the connected bincom compatible devices, with their board
-    revision and firmware version. Use --tty to select one when
-    several are found."""
-    import glob
-    import os
+    revision and firmware version. The other commands list them and
+    prompt to pick one when autodetecting several."""
     from bincoms import find_devices
     found = find_devices()
     if not found:
         print('No compatible device found')
         raise typer.Exit(1)
-    # Map the kernel device nodes to their stable /dev/serial/by-id
-    # names (Linux only, where they exist).
-    by_id = {}
-    for link in glob.glob('/dev/serial/by-id/*'):
-        by_id.setdefault(os.path.realpath(link), []).append(
-            os.path.basename(link))
     from rich.console import Console
-    from rich.table import Table
-    table = Table(box=None, pad_edge=False)
-    table.add_column('device', style='bold')
-    table.add_column('board')
-    table.add_column('firmware')
-    table.add_column('by-id', overflow='fold')
-    for dev in found:
-        try:
-            d = SmartIris(dev=dev, baudrate=115200)
-            bv = d.board_version
-            board = f'v{bv} ({d.board_version_source})' if bv else 'unknown'
-            fw = d.firmware_version
-            firmware = '.'.join(map(str, fw)) if fw else 'unknown'
-            d.com.close()
-        except Exception as e:
-            board = firmware = f'unreachable ({e.__class__.__name__})'
-        table.add_row(
-            dev, board, firmware,
-            '\n'.join(by_id.get(os.path.realpath(dev), [])) or 'n/a')
-    Console().print(table)
+    Console().print(devices_table(found))
 
 
 @app.command()

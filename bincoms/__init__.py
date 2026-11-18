@@ -39,6 +39,18 @@ status_message = ['Action performed successfully',
                   'Not used for now',
                   'The provided arguments are outside the allowed range']
 
+class SeveralDevicesError(IOError):
+    """Autodetect found more than one compatible device. Candidates
+    lists their paths (the probe connections are already closed)."""
+
+    def __init__(self, candidates):
+        self.candidates = [d._dev for d in candidates]
+        super().__init__(
+            f'Several compatible devices found: {self.candidates}. '
+            'Please specify which one to use with smartiris '
+            '-t [device_path]')
+
+
 def find_devices(keep_open=False):
     """Discover all bincom compatible devices.
 
@@ -107,7 +119,7 @@ class SerialBC(object):
                 self.__dict__.update(probed.__dict__)
                 return
             elif len(candidates) > 1:
-                raise IOError(f'Several compatible devices found: {[d._dev for d in candidates]}. Please specify which one to use with smartiris -t [device_path]')
+                raise SeveralDevicesError(candidates)
             else:
                 raise IOError(f'No compatible device found')
 

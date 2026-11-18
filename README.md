@@ -178,7 +178,7 @@ file.
 
 #### Options
 - `-t, --tty PORT`  
-  Specify the TTY port (default: `""` attempt to autodetect the relevant serial device).
+  Specify the TTY port (default: `""` attempt to autodetect the relevant serial device, prompting among several when the session is interactive).
 - `-w, --pulse-width SECONDS`  
   Set the duration of opening/closing pulses in seconds (default: `0.03`).
 - `-p, --port ID`  
@@ -221,8 +221,9 @@ file.
   List the connected bincom compatible devices, with for each one its
   board revision, firmware version and `/dev/serial/by-id` path (the
   stable name, to pin a board with `--tty`). The device is
-  autodetected by the other commands when `--tty` is omitted, provided
-  exactly one compatible device is connected.  
+  autodetected by the other commands when `--tty` is omitted; when
+  several compatible devices are found, an interactive session gets
+  this listing and is prompted to pick one.  
   Example: `smartiris devices`
 
 - `disable_buttons`  
