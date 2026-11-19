@@ -324,6 +324,11 @@ Roadmap
 
 Release History
 ---------------
+### v0.4.0
+- No Arduino IDE dependency anymore: `make` compiles the firmware with plain avr-g++. `make flash` flashes v2 boards, `make flashv1` the legacy v1 boards, and the firmware reports its version and the hardware revision it was built for
+- Temperature reporting: the MCU temperature on all boards, an external TMP36 probe and the capacitor bank voltage monitor on v2 boards, gated on the board revision
+- New `smartiris` command line tool built with typer: shell completion, a rich `status` report, a `devices` listing of connected boards, and a device picker when several are connected
+
 ### v0.3.1
 - When the shutter position sensor is cooked, it can be convenient to echo the pulse signals on the trigout
 ### v0.3.0
