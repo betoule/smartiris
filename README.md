@@ -94,6 +94,30 @@ Mac-OS users should look for the device appearing in:
 ls /dev/tty*.*
 ```
 
+#### The port is grabbed by brltty
+
+On Linux desktop systems (Ubuntu installs it by default), the `brltty`
+daemon, which drives USB braille displays, also claims by USB id the
+generic FTDI FT232 chip (`0403:6001`) used by the SmartIris boards.
+When the board is plugged in, brltty grabs the port and probes it with
+its braille protocol, visible in the system log:
+```
+brltty[560]: brltty: Unexpected Packet: 24
+```
+and the device may disappear from `/dev/serial/by-id/` or answer no
+command. On a machine dedicated to SmartIris, simply remove brltty:
+```bash
+sudo systemctl disable --now brltty
+sudo apt purge brltty brltty-udev
+```
+Otherwise an empty file shadowing the brltty udev rules keeps the port
+free (at the cost of USB braille displays no longer auto-attaching):
+```bash
+sudo touch /etc/udev/rules.d/85-brltty.rules
+sudo udevadm control --reload-rules
+```
+then unplug and replug the board.
+
 ### Hardware build
 
 * Schematics is available in directory `schematics`
