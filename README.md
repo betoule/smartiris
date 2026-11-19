@@ -117,40 +117,32 @@ ls /dev/tty*.*
 
 ### Hardware revisions (v1 and v2)
 
-Both hardware revisions run the same firmware code; build it for the
-revision at hand:
+Both hardware revisions run the same firmware code; build and flash
+it for the board at hand: `make flashv1` for the legacy **v1**
+boards, `make flash` for the **v2** ones. Each build embeds the
+revision it targets, together with the firmware version (kept in
+sync with the python package release), and reports both over the
+serial protocol: `smartiris status` and `smartiris devices` display
+them. Boards still running firmware that predates this reporting
+cannot always tell their revision (`unknown`) — just flash them with
+the build matching the board.
 
-- `make flash` builds and flashes firmware for the **v2** boards,
-- `make flashv1` flashes the build for the legacy **v1** boards.
+| option                                                      | v1 | v2 |
+|-------------------------------------------------------------|:--:|:--:|
+| external TMP36 temperature probe (ADC0)                       |  — |  ✓ |
+| capacitor bank voltage divider (ADC1)                         |  — |  ✓ |
+| Trig_IN header, TTL input (D4, internal pull-up)              |  — |  ✓ |
+| Trig_OUT header, echo of sensor events / pulse commands (D13) |  — |  ✓ |
 
-The v2 boards add two options the v1 boards lack: an external TMP36
-temperature probe (ADC0) and a voltage divider monitoring the
-capacitor bank (ADC1), both unwired on v1. Each build embeds the
-hardware revision it targets, together with the firmware version
-(kept in sync with the python package release), and reports both over
-the serial protocol: this compile-time identity is the reliable one,
-no attempt is made to guess a board from the analog levels of its
-(unwired on v1) ADC pins, which can sit at any level. `smartiris
-status` and `smartiris devices` display the revision with its
-source.
+The v2 trigger lines come out on 2-pin headers (signal + ground). On
+v1 boards neither is wired to a connector: D4 is unused and D13 only
+drives the Nano on-board LED (still toggled by the firmware).
 
-Two cases do not report a target. Firmware older than the v2
-hardware has no ADC commands at all, which places it reliably on a
-v1 board. Firmware of the interim era (ADC commands, no reporting)
-cannot tell its board: the revision is left unknown rather than
-guessed, and the v2-only features stay usable as they always were.
-The fix in both cases is the same — flash the build matching the
-board — and `smartiris status` says so.
-
-The `has_temperature_probe` and `has_capacitor_bank_monitor`
-properties tell which options the revision provides, and
-`read_temperature()` and `read_capacitor_bank_voltage()` raise
-`NotImplementedError` when the option is absent.
-
-The firmware also exposes `test_pullup(channel)`, which reads an ADC
-channel with the MCU internal ~30 kOhm pull-up enabled. It is a
-diagnostic primitive for probing wiring by hand, it no longer feeds
-any automatic decision.
+The v2-only features `read_temperature()` and
+`read_capacitor_bank_voltage()` are gated on the reported revision
+and raise `NotImplementedError` on v1 boards; the
+`has_temperature_probe` and `has_capacitor_bank_monitor` properties
+answer the same question in advance.
 
 Usage
 -----

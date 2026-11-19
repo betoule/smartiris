@@ -32,7 +32,6 @@ void get_time(uint8_t rb);
 void get_clock_calibration(uint8_t rb);
 void set_clock_calibration(uint8_t rb);
 void read_adc(uint8_t rb);
-void test_pullup(uint8_t rb);
 void get_firmware_version(uint8_t rb);
 void read_signature_row(uint8_t rb);
 void switch_button();
@@ -95,7 +94,7 @@ uint8_t n_record = 0;
 #define DISABLE_INT TIMSK1 = 0b00000000
 #define CLEAR_INT TIFR1 = _BV(OCF1A)
 
-const uint8_t NFUNC = 2+14;
+const uint8_t NFUNC = 2+13;
 uint8_t narg[NFUNC];
 // The exposed functions
 void (*func[NFUNC])(uint8_t rb) =
@@ -115,7 +114,6 @@ void (*func[NFUNC])(uint8_t rb) =
    set_clock_calibration,
    read_adc,
    read_signature_row,
-   test_pullup,
    get_firmware_version,
   };
 
@@ -135,7 +133,6 @@ const char* command_names[NFUNC*3] =
    "set_clock_calibration", "f", "",
    "read_adc", "B", "H",
    "read_signature_row", "H", "B",
-   "test_pullup", "B", "H",
    "get_firmware_version", "", "BBBB",
   };
 
@@ -438,41 +435,11 @@ void read_adc(uint8_t rb){
   client.snd((uint8_t *) &result, 2, STATUS_OK);
 }
 
-void test_pullup(uint8_t rb){
-  uint8_t channel = *((uint8_t *) (client.read_buffer + rb));
-  uint16_t result = 0;
-  // ADC channels 0..5 map to port C pins whose internal (~30 kOhm)
-  // pull-up can be enabled. Hosts use this to tell a low impedance
-  // source (the TMP36 probe and the capacitor bank divider wired on
-  // v2 boards) from a floating input (the same channels unwired on
-  // v1 boards): with the pull-up enabled a floating pin is dragged
-  // towards VCC while a driven pin barely moves.
-  if (channel > 5){
-    client.sndstatus(STATUS_ERROR);
-    return;
-  }
-  ADMUX = _BV(REFS1) | _BV(REFS0) | channel;
-  // Discard a first conversion while the multiplexer settles
-  ADCSRA |= _BV(ADSC);
-  while (ADCSRA & _BV(ADSC));
-  // Enable the pull-up, let the pin settle for the duration of two
-  // ADC conversions (~200 us, enough for floating nets to reach an
-  // equilibrium far below any wired source) and keep the last reading.
-  PORTC |= _BV(PC0 + channel);
-  ADCSRA |= _BV(ADSC);
-  while (ADCSRA & _BV(ADSC));
-  ADCSRA |= _BV(ADSC);
-  while (ADCSRA & _BV(ADSC));
-  result = ADCW;
-  PORTC &= ~_BV(PC0 + channel);
-  client.snd((uint8_t *) &result, 2, STATUS_OK);
-}
-
 // Firmware identity. The version follows the project release (see
 // pyproject.toml; the Makefile passes it in). BOARD_VERSION selects
 // the hardware this build targets: "make flash" builds for v2 boards,
-// "make flashv1" for the legacy v1 boards. The host reads all of it
-// and cross checks the target against the wired options.
+// "make flashv1" for the legacy v1 boards. The host reads all of it:
+// the compile-time target is the board's identity.
 #ifndef FIRMWARE_VERSION_MAJOR
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 0
