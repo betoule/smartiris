@@ -222,7 +222,8 @@ def devices():
     from bincoms import find_devices
     found = find_devices()
     if not found:
-        print('No compatible device found')
+        print('No compatible device found. (A device held by a running '
+              'smartiris server does not answer discovery.)')
         raise typer.Exit(1)
     from rich.console import Console
     Console().print(devices_table(found))

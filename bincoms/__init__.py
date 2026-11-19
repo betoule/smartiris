@@ -17,8 +17,6 @@ import time
 import serial
 import types
 import os
-import select
-from serial.serialutil import Timeout
 import termios
 
 status_codes = ['STATUS_OK',
@@ -51,20 +49,23 @@ class SeveralDevicesError(IOError):
             '(--tty on the command line)')
 
 
-def find_devices(keep_open=False):
+def find_devices(keep_open=False, probe_timeout=0.5):
     """Discover all bincom compatible devices.
 
     Returns the paths of the compatible devices. With keep_open=True,
     returns connected SerialBC instances instead (closed again unless
     exactly one device was found, so they are ready to be adopted for
-    a single-device autodetect connection)."""
+    a single-device autodetect connection). Foreign devices are
+    rejected by the protocol handshake of SerialBC; the probe timeout
+    is kept short so that silent devices on the bus do not slow the
+    discovery down."""
     import serial.tools.list_ports
     ports = serial.tools.list_ports.comports()
     devices = []
     for port in ports:
         if port.vid is not None:
             try:
-                device = SerialBC(dev=port.device)
+                device = SerialBC(dev=port.device, timeout=probe_timeout)
             except Exception:
                 continue
             if keep_open:
@@ -105,7 +106,8 @@ def _command_factory(self, f, s, a):
     return types.MethodType(func, self)
 
 class SerialBC(object):
-    def __init__(self, dev='/dev/ttyUSB0', baudrate=115200, debug=False, reset=False):
+    def __init__(self, dev='/dev/ttyUSB0', baudrate=115200, debug=False,
+                 reset=False, timeout=3):
         if not dev:
             # Autodetect: a single probed device is adopted as-is,
             # saving a second full connection handshake.
@@ -116,6 +118,10 @@ class SerialBC(object):
                 if reset or baudrate != probed._baudrate:
                     probed._baudrate = baudrate
                     probed._open(reset=reset)
+                # The probe connects with a short timeout, back to
+                # normal now that the device is adopted.
+                probed._timeout = timeout
+                probed.com.timeout = timeout
                 self.__dict__.update(probed.__dict__)
                 return
             elif len(candidates) > 1:
@@ -126,18 +132,24 @@ class SerialBC(object):
         self.debug=debug
         self._dev = dev
         self._baudrate = baudrate
+        self._timeout = timeout
         self._open(reset=reset)
-        #self.com.set_low_latency_mode(True)
-        #time.sleep(5)
-        #self.com.flush()
+        # A device is only compatible if it completes the command
+        # registration: foreign devices on the bus must not pass for
+        # one. Two attempts because a garbled first exchange after a
+        # reset is recovered by flushing and retrying.
         for i in range(2):
             try:
                 self._register_commands()
                 break
             except ValueError:
                 self.com.flush()
+        else:
+            self.com.close()
+            raise IOError(f'{self._dev} does not respond to the '
+                          'bincom protocol')
 
-    def _open(self, timeout=3, reset=False):
+    def _open(self, reset=False):
         try:
             self.com.close()
         except:
@@ -145,15 +157,19 @@ class SerialBC(object):
         # Disable reset after hangup
         if self.debug:
             print('Port closed')
-        f=os.open(self._dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-        attrs = termios.tcgetattr(f)
-        attrs[2] = attrs[2] & ~termios.HUPCL
-        termios.tcsetattr(f, termios.TCSAFLUSH, attrs)
-        os.close(f)
+        try:
+            f = os.open(self._dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+            attrs = termios.tcgetattr(f)
+            attrs[2] = attrs[2] & ~termios.HUPCL
+            termios.tcsetattr(f, termios.TCSAFLUSH, attrs)
+            os.close(f)
+        except OSError as e:
+            raise IOError(f'Could not open {self._dev}: {e}')
         if self.debug:
             print('Port set')
         try:
-            self.com = serial.Serial(self._dev, baudrate=self._baudrate, timeout=timeout, dsrdtr=None)
+            self.com = serial.Serial(self._dev, baudrate=self._baudrate,
+                                     timeout=self._timeout, dsrdtr=None)
             try:
                 # FTDI based adapters wait up to 16 ms (default
                 # latency timer) before sending a partially filled
@@ -163,8 +179,8 @@ class SerialBC(object):
                 self.com.set_low_latency_mode(True)
             except Exception:
                 pass
-        except:
-            print('Connexion failed')
+        except Exception as e:
+            raise IOError(f'Could not open {self._dev}: {e}')
         if self.debug:
             print('Port open')
         if reset:
@@ -175,17 +191,6 @@ class SerialBC(object):
             self.com.setDTR(True)
 
         
-    def _read(self, size):
-        read = bytearray()
-        #timeout = Timeout(self.com._timeout)
-        for i in range(10000):
-            buf = os.read(self.com.fd, size - len(read))
-            read.extend(buf)
-            if len(read) == size:
-                break
-            time.sleep(0.0001)
-        return bytes(read)
-    
     def _register_commands(self):
         self._get_nfunc = _command_factory(self, 0x00, b'', b'B')
         self._get_func_name = _command_factory(self, 0x01, b'BB', b's')
